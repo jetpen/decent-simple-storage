@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keycloak RFC 7523 claim path — prototype</title>
+<style>
+  :root { color: var(--foreground); font-family: inherit; }
+  * { box-sizing: border-box; }
+  body { color: var(--foreground); }
+  .wrap { max-width: 830px; }
+  h2 { font-size: 1.1rem; margin: 0 0 .35rem; }
+  p { margin: .35rem 0; line-height: 1.45; }
+  .muted { color: var(--muted-foreground); }
+  .row { display: flex; flex-wrap: wrap; gap: .55rem; align-items: stretch; margin: .8rem 0; }
+  .node { border: 1px solid var(--border); border-radius: 9px; padding: .7rem .8rem; min-width: 150px; flex: 1; }
+  .node b { display: block; margin-bottom: .25rem; }
+  .arrow { align-self: center; color: var(--muted-foreground); }
+  .callout { border-left: 3px solid var(--accent); padding: .65rem .8rem; margin: .8rem 0; }
+  .choice { display: block; width: 100%; text-align: left; border: 1px solid var(--border); border-radius: 9px; padding: .75rem .85rem; color: var(--foreground); background: transparent; margin: .5rem 0; cursor: pointer; }
+  .choice:hover, .choice:focus { border-color: var(--accent); outline: none; }
+  .choice strong { display:block; margin-bottom:.2rem; }
+  .tag { display:inline-block; border:1px solid var(--border); border-radius:999px; padding:.1rem .5rem; font-size:.8rem; color:var(--muted-foreground); }
+  .divider { border:0; border-top:1px solid var(--border); margin:1rem 0; }
+  .small { font-size:.9rem; }
+</style>
+<div class="wrap">
+  <h2>Where can wallet-grant claims enter the Keycloak access token?</h2>
+  <p class="muted">Prototype for <em>Prototype Keycloak RFC 7523 wallet-grant extension on pinned release</em>. It illustrates the claim-path question only; no extension or Keycloak server has been built.</p>
+  <div class="row" aria-label="Current selected flow">
+    <div class="node"><b>Wallet</b><span class="small">Signs grant: exact owner, Storage audience, object digest, actions, purpose, expiry, jti</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Keycloak token endpoint</b><span class="small">RFC 7523 exchange; custom IdP grant provider validates signature + current Identity/Registry</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Storage Resource Server</b><span class="small">Must receive verifiable per-grant scope; checks live enrollment, quota, object, revocation</span></div>
+  </div>
+  <div class="callout"><b>Source-backed gap:</b> Keycloak’s built-in grant creates a new token from the linked local user/session; docs do not promise arbitrary assertion-claim passthrough. The direct validation hook is in <code>server-spi-private</code>. The external assertion <code>sub</code> may also differ from the minted access-token <code>sub</code> (initialized from local user ID).</div>
+  <p><span class="tag">unproven</span> The next prototype must show a safe, exact path from <em>validated</em> grant fields to the signed access token without a Storage issuance callback.</p>
+  <hr class="divider">
+  <h2>Which claim-bridge path should this prototype test first?</h2>
+  <button class="choice" data-hermes-send="In Wayfinder issue 17, prototype the narrow Keycloak JWTAuthorizationGrantProvider plus a dedicated mapper bridge: after validation, carry only verified grant claims through a request/session-scoped trusted context into the Keycloak token mapper. Check primary Keycloak 26.8 APIs first; reject any client/user-editable attribute route; prove a real signed token and cluster-safe isolation. No Storage callback."
+  ><strong>A. Narrow grant-provider + mapper bridge <span class="tag">recommended to test first</span></strong><span class="small">Least replacement of the standard grant path, but a verified per-request handoff to the token mapper is not established yet.</span></button>
+  <button class="choice" data-hermes-send="In Wayfinder issue 17, test an OAuth2GrantType replacement for controlled verification-to-token-claim propagation. Keep RFC 7523 client-to-AS token-endpoint semantics, no Storage callback, and note that Keycloak 26.8 marks this grant SPI internal/private with higher upgrade burden."
+  ><strong>B. Replace the grant processor</strong><span class="small">More control over assertion validation and token construction, but uses the internal OAuth2GrantType SPI and raises compatibility/security cost.</span></button>
+  <button class="choice" data-hermes-send="In Wayfinder issue 17, test and document a stopping criterion: if verified wallet-grant claims cannot be safely carried into the standard Keycloak-issued access token without using the rejected Storage callback, record the incompatibility and return the architecture decision to me. Do not weaken Storage authorization or accept unchecked claims."
+  ><strong>C. Prove a stop condition</strong><span class="small">If neither extension path safely preserves the wallet’s object/action/purpose scope, stop and bring back the precise incompatibility; do not silently relax authorization.</span></button>
+  <p class="muted small">Clicking a path sends your preference into the chat; it does not change any ticket by itself.</p>
+</div>
