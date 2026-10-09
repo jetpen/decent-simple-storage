@@ -44,6 +44,7 @@ public final class DecentGrantIdentityProvider implements JWTAuthorizationGrantP
     if (!verifyStandardSignature(assertion.getJws())) throw new IdentityBrokerException("invalid wallet authorization signature");
     VerifiedGrantClaims claims = IdentityRegistryVerifier.testFixture().verify(assertion);
     if (!claims.ownerIdentifier().equals(assertion.getSubject())) throw new IdentityBrokerException("assertion subject mismatch");
+    if (claims.consentExpiresAt() > assertion.getJWT().getExp()) throw new IdentityBrokerException("grant consent outlives signed assertion");
     BrokeredIdentityContext brokered = new BrokeredIdentityContext(claims.ownerIdentifier(), config);
     GrantClaimContext.put(session, claims);
     brokered.setUsername(claims.ownerIdentifier());
