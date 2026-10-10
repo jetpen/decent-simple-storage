@@ -37,7 +37,7 @@ public final class DecentGrantIdentityProviderFactory extends AbstractIdentityPr
   @Override public IdentityProviderModel createConfig() { return new JWTAuthorizationGrantIdentityProviderConfig(); }
   @Override public Map<String,String> parseConfig(KeycloakSession session, String config) { throw new UnsupportedOperationException("use Admin configuration model"); }
   @Override public List<ProviderConfigProperty> getConfigProperties() {
-    ProviderConfigProperty verifier = new ProviderConfigProperty(); verifier.setName("verifierUrl"); verifier.setLabel("Internal Identity verifier URL"); verifier.setType(ProviderConfigProperty.STRING_TYPE); verifier.setHelpText("Private test verifier container URL; never user supplied.");
+    ProviderConfigProperty verifier = new ProviderConfigProperty(); verifier.setName("verifierUrl"); verifier.setLabel("Internal Identity verifier URL"); verifier.setType(ProviderConfigProperty.STRING_TYPE); verifier.setHelpText("Operator-configured HTTPS verifier origin with workload mutual TLS; never user supplied.");
     ProviderConfigProperty audiences = new ProviderConfigProperty(); audiences.setName("storageAudiences"); audiences.setLabel("Registered Storage audiences"); audiences.setType(ProviderConfigProperty.STRING_TYPE); audiences.setHelpText("Comma-separated operator-configured exact Storage audience values.");
     return List.of(verifier,audiences);
   }

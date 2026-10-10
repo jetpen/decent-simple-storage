@@ -13,5 +13,6 @@ FROM python:3.12-slim
 COPY --from=build /usr/local /usr/local
 WORKDIR /app
 COPY decent-simple-storage/docs/prototypes/keycloak-wallet-grant/verifier/app.py /app/app.py
+COPY decent-simple-storage/docs/prototypes/keycloak-wallet-grant/verifier/start_verifier.py /app/start_verifier.py
 ENV PYTHONUNBUFFERED=1
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "/app/start_verifier.py"]

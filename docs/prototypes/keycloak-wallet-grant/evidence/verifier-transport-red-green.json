@@ -1,0 +1,34 @@
+{
+  "before": {
+    "passed": false,
+    "transport": "mutual TLS with separate server/client trust anchors",
+    "cases": {
+      "missing_client": "accepted",
+      "unauthorized_client": "accepted",
+      "untrusted_server": "accepted",
+      "authorized_client": "accepted"
+    }
+  },
+  "after": {
+    "passed": true,
+    "transport": "mutual TLS with separate server/client trust anchors",
+    "cases": {
+      "missing_client": "tls_rejected",
+      "unauthorized_client": "tls_rejected",
+      "untrusted_server": "tls_rejected",
+      "authorized_client": "accepted",
+      "plaintext": "rejected",
+      "hostname_mismatch": "tls_rejected"
+    },
+    "missing_tls_image_startup": {
+      "exit_code": 1,
+      "refused": true
+    }
+  },
+  "initial_attempt_failure": "Generated certificates lacked authority/subject key identifiers required by strict certificate verification. First ownership-mapped scratch cleanup failed; ownership was restored and leftovers removed. Final run cleanup passed.",
+  "remaining_limits": [
+    "Dedicated client CA trusts all certificates it signs; production workload issuance/authorization/rotation/revocation still unspecified.",
+    "Other test links remain loopback/isolated plaintext; this proof secures only AS-verifier transport.",
+    "Not hermetic pinned-source/dependency builds."
+  ]
+}

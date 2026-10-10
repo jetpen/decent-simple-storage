@@ -29,6 +29,9 @@ cleanup() {
     if podman volume exists "$volume"; then podman volume rm "$volume" >/dev/null 2>&1 || cleanup_failed=1; fi
   done
   if [ -f "$SCRATCH/rotation-report.json" ]; then cp "$SCRATCH/rotation-report.json" "$REPORT_DIR/rotation.json"; fi
+  for node in keycloak1 keycloak2; do
+    if [ -d "$SCRATCH/tls-$node" ]; then podman unshare chown -R 0:0 "$SCRATCH/tls-$node" || cleanup_failed=1; fi
+  done
   rm -rf "$SCRATCH" || cleanup_failed=1
   [ ! -e "$SCRATCH" ] || cleanup_failed=1
   printf 'original_exit=%s cleanup_failed=%s\n' "$original_status" "$cleanup_failed" > "$REPORT_DIR/cleanup.txt"
@@ -53,6 +56,19 @@ pub=subprocess.run(['openssl','pkey','-in',sys.argv[1],'-pubout','-outform','DER
 realm=json.load(open(sys.argv[2]));realm['identityProviders'][0]['config']['publicKeySignatureVerifier']='-----BEGIN PUBLIC KEY-----\\n'+base64.b64encode(pub).decode()+'\\n-----END PUBLIC KEY-----';json.dump(realm,open(sys.argv[2],'w'))
 PY2
 export KC_WALLET_PUBLIC_KEY_HEX="$WALLET_PUB"
+"$REGISTRY_ROOT/.venv/bin/python" "$ROOT/scripts/create_verifier_tls.py" "$SCRATCH/tls"
+# Workloads receive only their own key/certificate and their peer trust anchor.
+for node in keycloak1 keycloak2; do
+  mkdir -m 700 "$SCRATCH/tls-$node"
+  cp "$SCRATCH/tls/server-ca.crt" "$SCRATCH/tls-$node/ca.crt"
+  cp "$SCRATCH/tls/$node.crt" "$SCRATCH/tls-$node/client.crt"
+  cp "$SCRATCH/tls/$node.key" "$SCRATCH/tls-$node/client.key"
+  podman unshare chown -R 1000:1000 "$SCRATCH/tls-$node"
+done
+mkdir -m 700 "$SCRATCH/tls-verifier"
+cp "$SCRATCH/tls/server.crt" "$SCRATCH/tls-verifier/server.crt"
+cp "$SCRATCH/tls/server.key" "$SCRATCH/tls-verifier/server.key"
+cp "$SCRATCH/tls/client-ca.crt" "$SCRATCH/tls-verifier/client-ca.crt"
 env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= mvn -B -DskipTests package
 podman build -f "$ROOT/container/Dockerfile" -t localhost/decent-kc-grant-prototype:26.8.0 "$ROOT"
 podman build -f "$ROOT/registry/Dockerfile" -t localhost/decent-registry-prototype:local "$REGISTRY_ROOT"
@@ -89,10 +105,11 @@ cp "$SCRATCH/owner.key" "$SCRATCH/registry-owner.key"
 podman run --rm --network "$NETWORK" -v "$SCRATCH:/scratch" localhost/decent-registry-prototype:local put identity --config /scratch/registry-cli/registry.yaml --owner-name "$OWNER_NAME_HEX" --owner-privkey /scratch/registry-owner.key --seq 1 >/dev/null
 # Start the private verifier with the same bootstrap multiaddr.
 
-podman run -d --name "$STACK-verifier-1" --network "$NETWORK" --network-alias verifier -p 18082:8000 -e REGISTRY_HOST="${REGISTRY_LISTEN_HOST:-0.0.0.0}" -e REGISTRY_CLIENT_PORT=0 -e REGISTRY_BOOTSTRAP_FILE=/bootstrap/bootstrap.multiaddr -v "$VOL_BOOT:/bootstrap:ro" -e REGISTRY_QUORUM=1 -e STORAGE_AUDIENCES=https://storage.example.test/instance/alpha,https://storage.example.test/instance/beta localhost/decent-identity-verifier-prototype:local >/dev/null
-for _ in $(seq 1 60); do podman exec "$STACK-verifier-1" python -c 'import urllib.request;urllib.request.urlopen("http://127.0.0.1:8000/healthz",timeout=2)' >/dev/null 2>&1 && break; sleep 1; done
+podman run -d --name "$STACK-verifier-1" --network "$NETWORK" --network-alias verifier -p 127.0.0.1:18082:8000 -v "$SCRATCH/tls-verifier:/tls:ro" -e REGISTRY_HOST="${REGISTRY_LISTEN_HOST:-0.0.0.0}" -e REGISTRY_CLIENT_PORT=0 -e REGISTRY_BOOTSTRAP_FILE=/bootstrap/bootstrap.multiaddr -v "$VOL_BOOT:/bootstrap:ro" -e REGISTRY_QUORUM=1 -e STORAGE_AUDIENCES=https://storage.example.test/instance/alpha,https://storage.example.test/instance/beta localhost/decent-identity-verifier-prototype:local >/dev/null
+for _ in $(seq 1 60); do curl -fsS --cacert "$SCRATCH/tls/server-ca.crt" --cert "$SCRATCH/tls/preflight.crt" --key "$SCRATCH/tls/preflight.key" https://127.0.0.1:18082/healthz >/dev/null 2>&1 && break; sleep 1; done
+"$REGISTRY_ROOT/.venv/bin/python" "$ROOT/scripts/check_verifier_tls.py" --url https://127.0.0.1:18082 --tls-dir "$SCRATCH/tls" --report "$REPORT_DIR/transport.json"
 # Gate the actual topology, not an unrelated fixture, before Keycloak starts.
-"$REGISTRY_ROOT/.venv/bin/python" "$ROOT/scripts/verify-live-fixture.py" --network "$NETWORK" --bootstrap "$BOOT" --key "$SCRATCH/owner.key" --verifier-url http://127.0.0.1:18082 --report "$REPORT_DIR/preflight.json"
+"$REGISTRY_ROOT/.venv/bin/python" "$ROOT/scripts/verify-live-fixture.py" --network "$NETWORK" --bootstrap "$BOOT" --key "$SCRATCH/owner.key" --verifier-url https://127.0.0.1:18082 --tls-dir "$SCRATCH/tls" --report "$REPORT_DIR/preflight.json"
 if [ "${KC_PREFLIGHT_ONLY:-0}" = 1 ]; then exit 0; fi
 podman run -d --name "$STACK-db-1" --network "$NETWORK" --network-alias db -e POSTGRES_DB=keycloak -e POSTGRES_USER=keycloak -e POSTGRES_PASSWORD=prototype-only -v "$VOL_DB:/var/lib/postgresql/data" docker.io/library/postgres:17-alpine >/dev/null
 for _ in $(seq 1 60); do podman exec "$STACK-db-1" pg_isready -U keycloak -d keycloak >/dev/null 2>&1 && break; sleep 1; done
@@ -101,18 +118,19 @@ podman exec "$STACK-db-1" pg_isready -U keycloak -d keycloak >/dev/null
 python3 - "$SCRATCH/realm.json" "$SCRATCH/owner.key" "$WALLET_PUB" <<'PY2'
 import sys,json,subprocess,base64
 p=sys.argv[1]; d=json.load(open(p)); pub=subprocess.run(['openssl','pkey','-in',sys.argv[2],'-pubout','-outform','DER'],check=True,capture_output=True).stdout
-d['identityProviders'][0]['config'].update({'publicKeySignatureVerifier':'-----BEGIN PUBLIC KEY-----\n'+base64.b64encode(pub).decode()+'\n-----END PUBLIC KEY-----','verifierUrl':'http://verifier:8000','jwtGrantAudiences':'http://127.0.0.1:18080/realms/decent,http://127.0.0.1:18081/realms/decent,http://keycloak1:8080/realms/decent,http://keycloak2:8080/realms/decent','storageAudiences':'https://storage.example.test/instance/alpha,https://storage.example.test/instance/beta'});json.dump(d,open(p,'w'))
+d['identityProviders'][0]['config'].update({'publicKeySignatureVerifier':'-----BEGIN PUBLIC KEY-----\n'+base64.b64encode(pub).decode()+'\n-----END PUBLIC KEY-----','verifierUrl':'https://verifier:8000','jwtGrantAudiences':'http://127.0.0.1:18080/realms/decent,http://127.0.0.1:18081/realms/decent,http://keycloak1:8080/realms/decent,http://keycloak2:8080/realms/decent','storageAudiences':'https://storage.example.test/instance/alpha,https://storage.example.test/instance/beta'});json.dump(d,open(p,'w'))
 PY2
-podman run -d --name "$STACK-keycloak1-1" --network "$NETWORK" --network-alias keycloak1 -p 18080:8080 -e KC_DB=postgres -e KC_DB_URL=jdbc:postgresql://db:5432/keycloak -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD=prototype-only -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin -e KC_HEALTH_ENABLED=true -e KC_CACHE=ispn -e KC_CACHE_STACK=jdbc-ping -e KC_CACHE_EMBEDDED_MTLS_ENABLED=false -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false -v "$SCRATCH/realm.json:/opt/keycloak/data/import/realm.json:ro" localhost/decent-kc-grant-prototype:26.8.0 start --cache=ispn --cache-stack=jdbc-ping --cache-embedded-mtls-enabled=false --http-enabled=true --hostname-strict=false --import-realm >/dev/null
+podman run -d --name "$STACK-keycloak1-1" --network "$NETWORK" --network-alias keycloak1 -p 18080:8080 -v "$SCRATCH/tls-keycloak1:/verifier-tls:ro" -e VERIFIER_TLS_CA=/verifier-tls/ca.crt -e VERIFIER_TLS_CLIENT_CERT=/verifier-tls/client.crt -e VERIFIER_TLS_CLIENT_KEY=/verifier-tls/client.key -e KC_DB=postgres -e KC_DB_URL=jdbc:postgresql://db:5432/keycloak -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD=prototype-only -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin -e KC_HEALTH_ENABLED=true -e KC_CACHE=ispn -e KC_CACHE_STACK=jdbc-ping -e KC_CACHE_EMBEDDED_MTLS_ENABLED=false -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false -v "$SCRATCH/realm.json:/opt/keycloak/data/import/realm.json:ro" localhost/decent-kc-grant-prototype:26.8.0 start --cache=ispn --cache-stack=jdbc-ping --cache-embedded-mtls-enabled=false --http-enabled=true --hostname-strict=false --import-realm >/dev/null
 for _ in $(seq 1 120); do curl -fsS http://127.0.0.1:18080/realms/decent/.well-known/openid-configuration >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS http://127.0.0.1:18080/realms/decent/.well-known/openid-configuration >/dev/null
-podman run -d --name "$STACK-keycloak2-1" --network "$NETWORK" --network-alias keycloak2 -p 18081:8080 -e KC_DB=postgres -e KC_DB_URL=jdbc:postgresql://db:5432/keycloak -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD=prototype-only -e KC_HEALTH_ENABLED=true -e KC_CACHE=ispn -e KC_CACHE_STACK=jdbc-ping -e KC_CACHE_EMBEDDED_MTLS_ENABLED=false -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false localhost/decent-kc-grant-prototype:26.8.0 start --cache=ispn --cache-stack=jdbc-ping --cache-embedded-mtls-enabled=false --http-enabled=true --hostname-strict=false >/dev/null
+podman run -d --name "$STACK-keycloak2-1" --network "$NETWORK" --network-alias keycloak2 -p 18081:8080 -v "$SCRATCH/tls-keycloak2:/verifier-tls:ro" -e VERIFIER_TLS_CA=/verifier-tls/ca.crt -e VERIFIER_TLS_CLIENT_CERT=/verifier-tls/client.crt -e VERIFIER_TLS_CLIENT_KEY=/verifier-tls/client.key -e KC_DB=postgres -e KC_DB_URL=jdbc:postgresql://db:5432/keycloak -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD=prototype-only -e KC_HEALTH_ENABLED=true -e KC_CACHE=ispn -e KC_CACHE_STACK=jdbc-ping -e KC_CACHE_EMBEDDED_MTLS_ENABLED=false -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false localhost/decent-kc-grant-prototype:26.8.0 start --cache=ispn --cache-stack=jdbc-ping --cache-embedded-mtls-enabled=false --http-enabled=true --hostname-strict=false >/dev/null
 for _ in $(seq 1 120); do curl -fsS http://127.0.0.1:18081/realms/decent/.well-known/openid-configuration >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS http://127.0.0.1:18081/realms/decent/.well-known/openid-configuration >/dev/null
 python3 "$ROOT/scripts/check-keycloak-cluster.py" --node "$STACK-keycloak1-1" --node "$STACK-keycloak2-1" --report "$REPORT_DIR/cluster.json"
 # Only the test JVM needs the disposable signing key; never print it.
 export KC_ASSERTION_PRIVATE_KEY="$(<"$SCRATCH/owner.key")"
 export KC_REGISTRY_CONTAINER="$STACK-registry-1"
+export KC_TEST_TLS_DIR="$SCRATCH/tls"
 export KC_TEST_SCRATCH="$SCRATCH" KC_TEST_NETWORK="$NETWORK" KC_TEST_BOOTSTRAP="$BOOT"
 export KC_URL=http://127.0.0.1:18080 KC_URL_2=http://127.0.0.1:18081 VERIFIER_URL=http://verifier:8000 KC_CLIENT_SECRET=prototype-secret KC_WALLET_PUBLIC_KEY_HEX="$WALLET_PUB"
-env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= JAVA_HOME="$JAVA_HOME" PATH="$PATH" mvn -B -Dtest=GrantClaimContextTest -Dit.test=RealTokenIsolationIT -DfailIfNoTests=false verify
+env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= JAVA_HOME="$JAVA_HOME" PATH="$PATH" mvn -B -Dtest=GrantClaimContextTest,VerifierTransportTest -Dit.test=RealTokenIsolationIT -DfailIfNoTests=false verify

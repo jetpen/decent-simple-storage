@@ -134,6 +134,25 @@ class RealTokenIsolationIT {
       for (var response:responses) if(response.statusCode()==200) assertIssuedClaims(response,expected);
     }
   }
+  @Test void verifierJavaClientRejectsMissingUnauthorizedAndUntrustedCredentials() throws Exception {
+    var directory=java.nio.file.Path.of(System.getenv("KC_TEST_TLS_DIR"));
+    URI endpoint=URI.create("https://127.0.0.1:18082/v1/verify-grant");
+    var certFactory=java.security.cert.CertificateFactory.getInstance("X.509");
+    var trust=java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());trust.load(null,null);
+    try(var input=java.nio.file.Files.newInputStream(directory.resolve("server-ca.crt"))) {trust.setCertificateEntry("server",certFactory.generateCertificate(input));}
+    var tm=javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());tm.init(trust);
+    var noClient=javax.net.ssl.SSLContext.getInstance("TLS");noClient.init(new javax.net.ssl.KeyManager[0],tm.getTrustManagers(),null);
+    var unauthorized=VerifierTLS.context(directory.resolve("server-ca.crt"),directory.resolve("unauthorized.crt"),directory.resolve("unauthorized.key"));
+    var untrusted=VerifierTLS.context(directory.resolve("rogue-ca.crt"),directory.resolve("preflight.crt"),directory.resolve("preflight.key"));
+    var request=HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(5)).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{}")).build();
+    for(var ssl:List.of(noClient,unauthorized,untrusted)) {
+      var client=HttpClient.newBuilder().sslContext(ssl).version(HttpClient.Version.HTTP_1_1).build();
+      assertThrows(java.io.IOException.class,()->client.send(request,HttpResponse.BodyHandlers.ofString()),"TLS failure must prevent an HTTP verifier response");
+    }
+    var authorized=VerifierTLS.context(directory.resolve("server-ca.crt"),directory.resolve("preflight.crt"),directory.resolve("preflight.key"));
+    var client=HttpClient.newBuilder().sslContext(authorized).version(HttpClient.Version.HTTP_1_1).build();
+    assertEquals(422,client.send(request,HttpResponse.BodyHandlers.ofString()).statusCode(),"authenticated request reaches schema validation");
+  }
   @Test void protectedHttpRequestsRecheckCurrentResourceStateWithoutIssuanceCallback() throws Exception {
     var approved=new java.util.concurrent.atomic.AtomicBoolean(true);
     var exists=new java.util.concurrent.atomic.AtomicBoolean(true);

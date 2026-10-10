@@ -29,7 +29,7 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command: >-
       while [ ! -s /bootstrap/bootstrap.multiaddr ]; do sleep 1; done;
-      uvicorn app:app --host 0.0.0.0 --port 8000
+      exec python /app/start_verifier.py
     environment:
       REGISTRY_HOST: 0.0.0.0
       REGISTRY_CLIENT_PORT: "0"
@@ -39,9 +39,10 @@ services:
     networks: [decent-test]
     volumes:
       - registry-bootstrap:/bootstrap:ro
+      - ${KC_TLS_ROOT:?Set KC_TLS_ROOT to the generated scratch root}/tls-verifier:/tls:ro
     depends_on: [bootstrap-init]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      test: ["CMD", "python", "-c", "import socket;socket.create_connection(('127.0.0.1',8000),2).close()"]
       interval: 2s
       timeout: 3s
       retries: 40
@@ -76,10 +77,14 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
       KC_PROXY_HEADERS: xforwarded
+      VERIFIER_TLS_CA: /verifier-tls/ca.crt
+      VERIFIER_TLS_CLIENT_CERT: /verifier-tls/client.crt
+      VERIFIER_TLS_CLIENT_KEY: /verifier-tls/client.key
     ports: ["18080:8080"]
     networks: [decent-test]
     volumes:
       - ./realm.json:/opt/keycloak/data/import/realm.json:ro
+      - ${KC_TLS_ROOT:?Set KC_TLS_ROOT to the generated scratch root}/tls-keycloak1:/verifier-tls:ro
     depends_on:
       db: {condition: service_healthy}
       verifier: {condition: service_healthy}
@@ -93,6 +98,8 @@ services:
     image: localhost/decent-kc-grant-prototype:26.8.0
     command: ["start", "--http-enabled=true", "--hostname-strict=false", "--cache=ispn", "--cache-stack=jdbc-ping", "--cache-embedded-mtls-enabled=false"]
     environment: *kc-env
+    volumes:
+      - ${KC_TLS_ROOT:?Set KC_TLS_ROOT to the generated scratch root}/tls-keycloak2:/verifier-tls:ro
     ports: ["18081:8080"]
     networks: [decent-test]
     depends_on:

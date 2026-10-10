@@ -1,6 +1,6 @@
 {
   "keycloak_version": "26.8.0",
-  "tests": 12,
+  "tests": 13,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
@@ -11,6 +11,10 @@
     },
     {
       "name": "simultaneousReplayAcrossNodesIssuesExactlyOneToken",
+      "passed": true
+    },
+    {
+      "name": "verifierJavaClientRejectsMissingUnauthorizedAndUntrustedCredentials",
       "passed": true
     },
     {
@@ -62,7 +66,8 @@
     "storage_resource_enforcement": "throwaway HTTP resource server with in-memory current policy flags; real issued token/JWKS verification, 7 protected requests; not production Storage or quota accounting",
     "standard_audience": "actual aud and storage_aud bind the verified Storage instance",
     "next_version": "26.8.1 manifest unknown, exit125; runtime compatibility not tested",
-    "signature_authority": "private verifier validates exact JWT signature against current Registry owner key; Keycloak core validates algorithm/time/audience/replay/link; stock IdP signature implementation not inherited"
+    "signature_authority": "private verifier validates exact JWT signature against current Registry owner key; Keycloak core validates algorithm/time/audience/replay/link; stock IdP signature implementation not inherited",
+    "verifier_transport": "HTTPS-only Java client with default hostname validation, custom server trust anchor and per-node client certificate; verifier requires dedicated client CA; no plaintext fallback/redirects"
   },
   "rotation": {
     "status": "passed",
@@ -71,24 +76,24 @@
     "exact_remote_candidate": true,
     "fresh_history_resolution": true,
     "seq": 2,
-    "state_hash": "66e82c3c88c8708a02e13bea7f3b86f88f377ae8401c36dbd7bb445f161dc5cb",
-    "new_public_key_hex": "09666d3b88f56f143c1ab109ea2b87e52d254dde38fd454449294c323e42cf40"
+    "state_hash": "30084650a95b0027fa4f0daf6152ec7a3f4e61bad52475766910fde9aa0e75b8",
+    "new_public_key_hex": "4bbe34a8210a144234ff4ce5c203d37109c4bfcd57b85b0101e25d85be57c0a1"
   },
   "cluster": {
     "passed": true,
     "nodes": {
-      "decent-kc-prototype-3966594-keycloak1-1": {
-        "view": "[26f9db682d99-5866(v=16.0.15)|1]",
+      "decent-kc-prototype-4001029-keycloak1-1": {
+        "view": "[0d3ce75e0171-12714(v=16.0.15)|1]",
         "members": [
-          "26f9db682d99-5866(v=16.0.15)",
-          "663b7877b2d5-2672(v=16.0.15)"
+          "0d3ce75e0171-12714(v=16.0.15)",
+          "7f7b2e9d555a-50707(v=16.0.15)"
         ]
       },
-      "decent-kc-prototype-3966594-keycloak2-1": {
-        "view": "[26f9db682d99-5866(v=16.0.15)|1]",
+      "decent-kc-prototype-4001029-keycloak2-1": {
+        "view": "[0d3ce75e0171-12714(v=16.0.15)|1]",
         "members": [
-          "26f9db682d99-5866(v=16.0.15)",
-          "663b7877b2d5-2672(v=16.0.15)"
+          "0d3ce75e0171-12714(v=16.0.15)",
+          "7f7b2e9d555a-50707(v=16.0.15)"
         ]
       }
     }
@@ -101,5 +106,37 @@
       "http_verifier": "passed"
     }
   },
-  "cleanup": "original_exit=0 cleanup_failed=0"
+  "cleanup": "original_exit=0 cleanup_failed=0",
+  "transport": {
+    "passed": true,
+    "transport": "mutual TLS with separate server/client trust anchors",
+    "cases": {
+      "missing_client": "tls_rejected",
+      "unauthorized_client": "tls_rejected",
+      "untrusted_server": "tls_rejected",
+      "authorized_client": "accepted",
+      "plaintext": "rejected",
+      "hostname_mismatch": "tls_rejected"
+    },
+    "missing_tls_image_startup": {
+      "exit_code": 1,
+      "refused": true
+    }
+  },
+  "unit_suites": [
+    {
+      "name": "GrantClaimContextTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "VerifierTransportTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
 }

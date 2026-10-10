@@ -20,7 +20,10 @@ def main():
   parser.add_argument('--key', type=Path, required=True)
   parser.add_argument('--verifier-url', required=True)
   parser.add_argument('--report', type=Path, required=True)
+  parser.add_argument('--tls-dir', type=Path, required=True)
   args = parser.parse_args()
+  from check_verifier_tls import context
+  tls = context(args.tls_dir, 'preflight')
   from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
   from cryptography.hazmat.primitives.serialization import load_pem_private_key, Encoding, PublicFormat
   key = load_pem_private_key(args.key.read_bytes(), None)
@@ -60,7 +63,7 @@ trio.run(main)
     signing_input = (b64(b'{"alg":"EdDSA"}')+'.'+b64(json.dumps(fields).encode())).encode()
     fields.update(assertion_signing_input_b64=b64(signing_input), assertion_signature_b64=b64(key.sign(signing_input)))
     request = urllib.request.Request(args.verifier_url+'/v1/verify-grant',data=json.dumps(fields).encode(),headers={'Content-Type':'application/json'})
-    with urllib.request.urlopen(request,timeout=15) as response:
+    with urllib.request.urlopen(request,timeout=15,context=tls) as response:
       body = json.load(response)
       assert response.status == 200
     assert body['owner_key_fingerprint']=='ed25519:'+hashlib.sha256(bytes.fromhex(public)).hexdigest()

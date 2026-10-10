@@ -124,16 +124,20 @@ trio.run(main)
       report["gates"][stage] = {"status": "passed" if result.returncode == 0 else "failed", "diagnostic": result.stdout.strip()}
       assert result.returncode == 0, "resolver container failed"
       if not args.skip_http:
+        from create_verifier_tls import create
+        from check_verifier_tls import context
+        create(scratch / "tls")
+        tls = context(scratch / "tls", "preflight")
         stage = "http_verifier"
         verifier = stack + "-verifier"
         containers.append(verifier)
-        checked("podman", "run", "-d", "--name", verifier, "--network", stack, "-p", "127.0.0.1::8000", "-e", f"REGISTRY_HOST={args.listen_host}", "-e", "REGISTRY_CLIENT_PORT=0", "-e", f"REGISTRY_BOOTSTRAP={bootstrap}", "-e", "REGISTRY_QUORUM=1", "-e", f"STORAGE_AUDIENCES={AUDIENCE}", "localhost/decent-identity-verifier-prototype:local")
+        checked("podman", "run", "-d", "--name", verifier, "--network", stack, "-p", "127.0.0.1::8000", "-v", f"{scratch / 'tls'}:/tls:ro", "-e", f"REGISTRY_HOST={args.listen_host}", "-e", "REGISTRY_CLIENT_PORT=0", "-e", f"REGISTRY_BOOTSTRAP={bootstrap}", "-e", "REGISTRY_QUORUM=1", "-e", f"STORAGE_AUDIENCES={AUDIENCE}", "localhost/decent-identity-verifier-prototype:local")
         published = checked("podman", "port", verifier, "8000/tcp").strip()
-        url = "http://" + published
+        url = "https://" + published
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
           try:
-            urllib.request.urlopen(url + "/healthz", timeout=2).close()
+            urllib.request.urlopen(url + "/healthz", timeout=2, context=tls).close()
             break
           except (OSError, urllib.error.URLError):
             time.sleep(.3)
@@ -143,7 +147,7 @@ trio.run(main)
         fields.update(assertion_signing_input_b64=b64(signing_input), assertion_signature_b64=b64(key.sign(signing_input)))
         req = urllib.request.Request(url + "/v1/verify-grant", data=json.dumps(fields).encode(), headers={"Content-Type": "application/json"})
         try:
-          with urllib.request.urlopen(req, timeout=30) as response:
+          with urllib.request.urlopen(req, timeout=30, context=tls) as response:
             body = json.load(response)
             status = response.status
         except urllib.error.HTTPError as exc:

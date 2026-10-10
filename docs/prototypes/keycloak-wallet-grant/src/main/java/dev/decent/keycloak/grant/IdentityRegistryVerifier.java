@@ -29,7 +29,9 @@ public interface IdentityRegistryVerifier {
   }
 
   static IdentityRegistryVerifier remote(String baseUrl, java.util.Set<String> acceptedAudiences) {
-    HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(2)).build();
+    URI endpoint = URI.create(baseUrl);
+    if (!"https".equals(endpoint.getScheme()) || endpoint.getHost()==null || endpoint.getUserInfo()!=null || endpoint.getQuery()!=null || endpoint.getFragment()!=null || !(endpoint.getPath().isEmpty() || endpoint.getPath().equals("/"))) throw new IllegalArgumentException("verifier requires an operator-configured HTTPS origin without credentials/query/path");
+    HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).sslContext(VerifierTLS.context()).followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(2)).build();
     java.util.Set<String> allowedAudiences = java.util.Set.copyOf(acceptedAudiences);
     if (allowedAudiences.isEmpty()) throw new IllegalArgumentException("registered Storage audiences required");
     return assertion -> {
