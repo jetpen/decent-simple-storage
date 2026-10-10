@@ -23,7 +23,7 @@ public final class VerifiedGrantProtocolMapper extends AbstractOIDCProtocolMappe
     if (verified.isEmpty()) return token; // normal OIDC flows get no grant claims
     var g = verified.get();
     token.setSubject(g.ownerIdentifier());
-    token.setSubject(g.ownerIdentifier());
+    token.exp(Math.min(token.getExp(), g.consentExpiresAt()));
     token.setOtherClaims("storage_aud", g.storageAudience());
     token.setOtherClaims("owner_identifier", g.ownerIdentifier());
     token.setOtherClaims("owner_key_fingerprint", g.ownerKeyFingerprint());

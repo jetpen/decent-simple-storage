@@ -29,7 +29,7 @@ public interface IdentityRegistryVerifier {
   }
 
   static IdentityRegistryVerifier remote(String baseUrl, java.util.Set<String> acceptedAudiences) {
-    HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(2)).build();
     java.util.Set<String> allowedAudiences = java.util.Set.copyOf(acceptedAudiences);
     if (allowedAudiences.isEmpty()) throw new IllegalArgumentException("registered Storage audiences required");
     return assertion -> {

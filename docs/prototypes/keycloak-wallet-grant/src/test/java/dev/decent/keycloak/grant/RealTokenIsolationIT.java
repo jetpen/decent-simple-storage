@@ -33,7 +33,10 @@ class RealTokenIsolationIT {
     clientId=System.getenv().getOrDefault("KC_CLIENT_ID","decent-client");
     clientSecret=System.getenv().getOrDefault("KC_CLIENT_SECRET","prototype-secret");
     String raw=System.getenv("KC_ASSERTION_PRIVATE_KEY").replaceAll("-----[^-]+-----", "").replaceAll("\\s", "");assertionKey=KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(raw)));
-    HttpResponse<String> r=http.send(HttpRequest.newBuilder(URI.create(url+"/realms/decent/.well-known/openid-configuration")).GET().build(),HttpResponse.BodyHandlers.ofString());assertTrue(r.statusCode()==200 || r.statusCode()==404,r.body());
+    HttpResponse<String> r=http.send(HttpRequest.newBuilder(URI.create(url+"/realms/decent/.well-known/openid-configuration")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(200,r.statusCode());
+    Map<String,Object> first=claims(UUID.randomUUID().toString()),second=claims(UUID.randomUUID().toString());
+    assertIssuedClaims(exchange(assertion(first)),first);
+    assertIssuedClaims(exchangeAt(System.getenv("KC_URL_2")+"/realms/decent/protocol/openid-connect/token",assertion(second)),second);
   }
   private String assertion(Map<String,Object> extra) {
     AccessToken a=new AccessToken();a.id(extra.get("grant_jti").toString());a.subject("mailto:alice@example.org");a.issuer("https://wallet.test");a.audience(issuer);a.issuedNow();a.exp(System.currentTimeMillis()/1000+55L);a.setOtherClaims("decent_grant",extra);
@@ -78,17 +81,74 @@ class RealTokenIsolationIT {
     HttpResponse<String> replay=exchangeAt(System.getenv("KC_URL_2")+"/realms/decent/protocol/openid-connect/token",signed);
     assertEquals(400,replay.statusCode());assertTrue(replay.body().contains("invalid_grant"));
   }
+  @Test void registryOutageFailsClosedAndRecoveryNeedsFreshGrant() throws Exception {
+    String container=System.getenv("KC_REGISTRY_CONTAINER");
+    assertNotNull(container);
+    assertEquals(0,new ProcessBuilder("podman","pause",container).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start().waitFor());
+    try {
+      var denied=exchange(assertion(claims(UUID.randomUUID().toString())));
+      assertEquals(400,denied.statusCode());
+      assertFalse(json.readTree(denied.body()).hasNonNull("access_token"));
+    } finally {
+      assertEquals(0,new ProcessBuilder("podman","unpause",container).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start().waitFor());
+    }
+    Map<String,Object> fresh=claims(UUID.randomUUID().toString());
+    assertIssuedClaims(exchange(assertion(fresh)),fresh);
+  }
+  @Test void currentKeyMismatchAndUnregisteredAudienceAreRejected() throws Exception {
+    Map<String,Object> wrongKey=new HashMap<>(claims(UUID.randomUUID().toString())); wrongKey.put("wallet_public_key","00".repeat(32));
+    assertEquals(400,exchange(assertion(wrongKey)).statusCode());
+    Map<String,Object> wrongAudience=new HashMap<>(claims(UUID.randomUUID().toString())); wrongAudience.put("storage_aud","https://unregistered.example.test");
+    assertEquals(400,exchange(assertion(wrongAudience)).statusCode());
+  }
   @Test void assertionTamperingIsRejected() throws Exception {
     String signed=assertion(claims(UUID.randomUUID().toString()));
     String[] parts=signed.split("\\.");byte[] payload=Base64.getUrlDecoder().decode(parts[1]);payload[payload.length/2]^=1;parts[1]=Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
     HttpResponse<String> r=exchange(String.join(".",parts));assertEquals(400,r.statusCode());assertTrue(r.body().contains("invalid_grant"));
   }
   @Test void concurrentRequestsAcrossTwoClusterNodesDoNotCrossContaminateClaims() throws Exception {
-    String a=assertion(claims(UUID.randomUUID().toString())), b=assertion(claims(UUID.randomUUID().toString()));
-    HttpResponse<String> ra=exchangeAt(tokenUrl,a), rb=exchangeAt(System.getenv().getOrDefault("KC_URL_2","http://127.0.0.1:18081")+"/realms/decent/protocol/openid-connect/token",b);
-    assertEquals(200,ra.statusCode(),ra.body()); assertEquals(200,rb.statusCode(),rb.body());
-    JsonNode pa=json.readTree(ra.body()), pb=json.readTree(rb.body());
-    assertNotEquals(decodePayload(pa.get("access_token").asText()).get("wallet_grant_jti").asText(),decodePayload(pb.get("access_token").asText()).get("wallet_grant_jti").asText());
+    for (int round=0; round<8; round++) {
+      Map<String,Object> a=new HashMap<>(claims(UUID.randomUUID().toString()));
+      Map<String,Object> b=new HashMap<>(claims(UUID.randomUUID().toString()));
+      b.put("object_digest","sha256:"+"b".repeat(64)); b.put("actions",List.of("read"));
+      b.put("purpose","second-purpose"); b.put("storage_aud","https://storage.example.test/instance/beta");
+      var responses=race(assertion(a),assertion(b));
+      assertIssuedClaims(responses.get(0),a); assertIssuedClaims(responses.get(1),b);
+    }
   }
-  private HttpResponse<String> exchangeUnchecked(String endpoint,String assertion) {try{return exchangeAt(endpoint,assertion);}catch(Exception e){throw new RuntimeException(e);}}
+  @Test void simultaneousReplayAcrossNodesIssuesExactlyOneToken() throws Exception {
+    for (int round=0; round<12; round++) {
+      Map<String,Object> expected=claims(UUID.randomUUID().toString());
+      String signed=assertion(expected);
+      var responses=race(signed,signed);
+      assertEquals(1,responses.stream().filter(r->r.statusCode()==200).count(),"one-use assertion must have exactly one winner");
+      assertEquals(1,responses.stream().filter(r->r.statusCode()==400 && r.body().contains("invalid_grant")).count(),"one replay loser");
+      for (var response:responses) if(response.statusCode()==200) assertIssuedClaims(response,expected);
+    }
+  }
+  private List<HttpResponse<String>> race(String a,String b) throws Exception {
+    var barrier=new java.util.concurrent.CyclicBarrier(3);
+    String endpoint2=System.getenv("KC_URL_2")+"/realms/decent/protocol/openid-connect/token";
+    try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var first=executor.submit(()->{barrier.await(10,java.util.concurrent.TimeUnit.SECONDS);return exchangeAt(tokenUrl,a);});
+      var second=executor.submit(()->{barrier.await(10,java.util.concurrent.TimeUnit.SECONDS);return exchangeAt(endpoint2,b);});
+      barrier.await(10,java.util.concurrent.TimeUnit.SECONDS);
+      return List.of(first.get(30,java.util.concurrent.TimeUnit.SECONDS),second.get(30,java.util.concurrent.TimeUnit.SECONDS));
+    }
+  }
+  private void assertIssuedClaims(HttpResponse<String> response,Map<String,Object> expected) throws Exception {
+    assertEquals(200,response.statusCode(),"token exchange failed");
+    JsonNode envelope=json.readTree(response.body()); assertFalse(envelope.hasNonNull("refresh_token"));
+    String jwt=envelope.get("access_token").asText();verifyKeycloakSignature(jwt);
+    JsonNode token=decodePayload(jwt);
+    assertEquals("mailto:alice@example.org",token.get("sub").asText());
+    assertEquals(expected.get("storage_aud"),token.get("storage_aud").asText());
+    assertEquals(expected.get("object_digest"),token.get("storage_object_digest").asText());
+    assertEquals(json.valueToTree(expected.get("actions")),token.get("storage_actions"));
+    assertEquals(expected.get("purpose"),token.get("storage_purpose").asText());
+    assertEquals(expected.get("grant_jti"),token.get("wallet_grant_jti").asText());
+    assertEquals(((Number)expected.get("consent_exp")).longValue(),token.get("wallet_consent_exp").asLong());
+    assertTrue(token.get("exp").asLong()<=((Number)expected.get("consent_exp")).longValue(),"token expiry must not exceed wallet consent");
+    assertEquals(1,token.get("identity_registry_seq").asInt());
+  }
 }

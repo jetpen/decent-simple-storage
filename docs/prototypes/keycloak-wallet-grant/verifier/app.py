@@ -14,10 +14,21 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from decent_identity.identity_resolver import IdentityHistoryUnavailable, resolve_identity_record, _derive_owner_name_hex_from_identifier
 
 app = FastAPI(title="Prototype Registry verifier", docs_url=None, redoc_url=None)
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request, exc):
+  # Record only schema field names/categories, never values or signed data.
+  fields = sorted({str(error['loc'][-1]) for error in exc.errors()})
+  kinds = sorted({error['type'] for error in exc.errors()})
+  logging.getLogger('prototype.verifier').warning('Grant schema rejected fields=%s kinds=%s', ','.join(fields), ','.join(kinds))
+  return JSONResponse(status_code=422, content={'detail':'grant schema rejected'})
+
 
 IDENTIFIER_RE = re.compile(r"(?:mailto:[^\s]+|tel:\\+?[0-9]+)\Z")
 FINGERPRINT_RE = re.compile(r"ed25519:[0-9a-f]{64}\Z")

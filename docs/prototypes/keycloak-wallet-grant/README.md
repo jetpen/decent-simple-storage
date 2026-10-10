@@ -27,7 +27,7 @@ Run the live integration with:
 KC_ASSERTION_PRIVATE_KEY=/path/to/disposable-key.pem ./scripts/run-podman-cluster-test.sh
 ```
 
-The fixture/verifier prerequisite is now verified; the full Keycloak integration is not. Nine Python tests pass (with one dependency deprecation warning), and clean Podman runs pass writer-independent exact Identity/key/sequence read-back, resolution inside the verifier image, and HTTP 200 with exact verified claims through the running Uvicorn endpoint. See [Registry fixture prerequisite](https://github.com/jetpen/decent-simple-storage/issues/19).
+The fixture/verifier prerequisite and the live two-node slice below are verified; the full issue acceptance criteria are not. Nine Python tests pass (with one dependency deprecation warning), and clean Podman runs pass writer-independent exact Identity/key/sequence read-back, resolution inside the verifier image, and HTTP 200 with exact verified claims through the running Uvicorn endpoint. See [Registry fixture prerequisite](https://github.com/jetpen/decent-simple-storage/issues/19).
 
 ### Preflight only
 
@@ -53,4 +53,10 @@ Build the Registry and verifier images first with the Dockerfiles in this direct
 - The libp2p resolver requires **Trio**, while Uvicorn serves requests on **asyncio**. Direct awaiting raises an `AttributeError` in Trio's runtime. The private verifier now runs a bounded Trio lookup in an AnyIO worker thread, with ephemeral client ports for concurrent requests. Tests demonstrate the old failure and the corrected HTTP positive control.
 - A `Value not found` log during genesis publication can describe the pre-write lookup; it did not prove publication failed. Fresh read-back succeeded after the writer exited.
 
-The cluster runner and Java test changes remain an unfinished prototype: no fresh Keycloak signed-token or cluster proof is claimed here. The existing test named `concurrentRequestsAcrossTwoClusterNodesDoNotCrossContaminateClaims` currently makes sequential requests; it must be corrected to genuinely concurrent exchanges in the Keycloak prototype task. Cluster membership, simultaneous replay atomicity, outage/owner-key rotation, resource enforcement, and upgrade compatibility remain unproven. The copied `run-single-node-test.sh` is a historical runner and is not verified against the current live-verifier configuration; use the published earlier commit for the original fixture-only baseline.
+### Live two-node result
+
+The latest run passes one context unit test and nine real integration tests with zero failures/errors/skips. Both nodes report the same two-member Infinispan cluster view. A `BeforeAll` positive control verifies real Registry-backed issuance and exact claims on each node before negative tests run. Eight barrier-synchronized distinct-grant rounds verify token signatures and exact object/actions/purpose/audience/jti/consent fields without cross-contamination. Twelve identical-assertion races across both nodes each issue exactly one token and reject the other request. A paused Registry fails closed with no token; after unpause a fresh grant succeeds. Key mismatch, unregistered audience, tampering and sequential cross-node replay are rejected. No refresh token is issued. See `evidence/keycloak-live-cluster.json`.
+
+Two additional defects were exposed and fixed: Java HttpClient attempted an h2c upgrade that caused the Uvicorn endpoint to see a missing body; the private verifier client now explicitly uses HTTP/1.1. The initial token expiration was capped by assertion expiry but could outlive the shorter wallet consent; the mapper now caps token `exp` at verified consent expiry, and real-token tests fail without that change.
+
+This remains a limited prototype, not a global replay or production guarantee. Owner-key rotation, current Storage entitlement/object/quota enforcement, clean dependency/image pinning, and next-version compatibility remain outstanding. The copied `run-single-node-test.sh` is a historical runner and is not verified against the current live-verifier configuration; use the published earlier commit for the original fixture-only baseline.

@@ -17,7 +17,7 @@ cleanup() {
   local original_status=$? cleanup_failed=0
   trap - EXIT
   # Retain only whitelisted verifier categories, never complete service logs.
-  podman logs "$STACK-verifier-1" 2>&1 | python3 -c 'import re,sys;print("\n".join(re.findall(r"Identity verification category=[a-z_]+",sys.stdin.read())))' > "$REPORT_DIR/verifier-categories.txt" || true
+  podman logs "$STACK-verifier-1" 2>&1 | python3 -c 'import re,sys;print("\n".join(re.findall(r"(?:Identity verification category=[a-z_]+|Grant schema rejected fields=[a-z_,]+ kinds=[a-z_,]+)",sys.stdin.read())))' > "$REPORT_DIR/verifier-categories.txt" || true
   for container in "$STACK-keycloak1-1" "$STACK-keycloak2-1" "$STACK-verifier-1" "$STACK-bootstrap-init-1" "$STACK-db-1" "$STACK-registry-1"; do
     if podman container exists "$container"; then
       podman rm -f "$container" >/dev/null 2>&1 || cleanup_failed=1
@@ -107,7 +107,10 @@ for _ in $(seq 1 120); do curl -fsS http://127.0.0.1:18080/realms/decent/.well-k
 curl -fsS http://127.0.0.1:18080/realms/decent/.well-known/openid-configuration >/dev/null
 podman run -d --name "$STACK-keycloak2-1" --network "$NETWORK" --network-alias keycloak2 -p 18081:8080 -e KC_DB=postgres -e KC_DB_URL=jdbc:postgresql://db:5432/keycloak -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD=prototype-only -e KC_HEALTH_ENABLED=true -e KC_CACHE=ispn -e KC_CACHE_STACK=jdbc-ping -e KC_CACHE_EMBEDDED_MTLS_ENABLED=false -e KC_HTTP_ENABLED=true -e KC_HOSTNAME_STRICT=false localhost/decent-kc-grant-prototype:26.8.0 start --cache=ispn --cache-stack=jdbc-ping --cache-embedded-mtls-enabled=false --http-enabled=true --hostname-strict=false >/dev/null
 for _ in $(seq 1 120); do curl -fsS http://127.0.0.1:18081/realms/decent/.well-known/openid-configuration >/dev/null 2>&1 && break; sleep 1; done
+curl -fsS http://127.0.0.1:18081/realms/decent/.well-known/openid-configuration >/dev/null
+python3 "$ROOT/scripts/check-keycloak-cluster.py" --node "$STACK-keycloak1-1" --node "$STACK-keycloak2-1" --report "$REPORT_DIR/cluster.json"
 # Only the test JVM needs the disposable signing key; never print it.
 export KC_ASSERTION_PRIVATE_KEY="$(<"$SCRATCH/owner.key")"
+export KC_REGISTRY_CONTAINER="$STACK-registry-1"
 export KC_URL=http://127.0.0.1:18080 KC_URL_2=http://127.0.0.1:18081 VERIFIER_URL=http://verifier:8000 KC_CLIENT_SECRET=prototype-secret KC_WALLET_PUBLIC_KEY_HEX="$WALLET_PUB"
 env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= JAVA_HOME="$JAVA_HOME" PATH="$PATH" mvn -B -Dtest=GrantClaimContextTest -Dit.test=RealTokenIsolationIT -DfailIfNoTests=false verify

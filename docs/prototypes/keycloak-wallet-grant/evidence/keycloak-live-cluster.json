@@ -1,0 +1,81 @@
+{
+  "keycloak_version": "26.8.0",
+  "tests": 9,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "simultaneousReplayAcrossNodesIssuesExactlyOneToken",
+      "passed": true
+    },
+    {
+      "name": "signedGrantMintsSignedTokenWithExactClaimsAndNoRefresh",
+      "passed": true
+    },
+    {
+      "name": "registryOutageFailsClosedAndRecoveryNeedsFreshGrant",
+      "passed": true
+    },
+    {
+      "name": "replayedAssertionIsRejectedAcrossNodes",
+      "passed": true
+    },
+    {
+      "name": "grantClaimsRemainBoundToTheirSignedStorageAudience",
+      "passed": true
+    },
+    {
+      "name": "assertionTamperingIsRejected",
+      "passed": true
+    },
+    {
+      "name": "currentKeyMismatchAndUnregisteredAudienceAreRejected",
+      "passed": true
+    },
+    {
+      "name": "walletSignatureMustUseCurrentRegistryKey",
+      "passed": true
+    },
+    {
+      "name": "concurrentRequestsAcrossTwoClusterNodesDoNotCrossContaminateClaims",
+      "passed": true
+    }
+  ],
+  "scope": {
+    "distinct_grant_barrier_rounds": 8,
+    "identical_assertion_replay_barrier_rounds": 12,
+    "registry_outage": "paused test Registry then restored; no token while unavailable; fresh grant succeeded",
+    "owner_key_rotation": "not yet tested",
+    "storage_resource_enforcement": "not yet tested",
+    "next_version": "not yet tested"
+  },
+  "cluster": {
+    "passed": true,
+    "nodes": {
+      "decent-kc-prototype-3937266-keycloak1-1": {
+        "view": "[460c02f7c5a4-30840(v=16.0.15)|1]",
+        "members": [
+          "460c02f7c5a4-30840(v=16.0.15)",
+          "47b3faacd546-3019(v=16.0.15)"
+        ]
+      },
+      "decent-kc-prototype-3937266-keycloak2-1": {
+        "view": "[460c02f7c5a4-30840(v=16.0.15)|1]",
+        "members": [
+          "460c02f7c5a4-30840(v=16.0.15)",
+          "47b3faacd546-3019(v=16.0.15)"
+        ]
+      }
+    }
+  },
+  "preflight": {
+    "status": "passed",
+    "gates": {
+      "independent_read": "passed",
+      "resolver_container": "passed",
+      "http_verifier": "passed"
+    }
+  },
+  "cleanup": "original_exit=0 cleanup_failed=0"
+}
