@@ -89,10 +89,36 @@ Requires Git, uv, Podman, OpenSSL, Java 21/Maven and the named local repositorie
 
 `build/pinned-inputs.json` pins Registry/Identity commits and base Keycloak/Python/PostgreSQL/Alpine OCI digests. Each run creates unique derived-image tags, records immutable image IDs, and passes those IDs to every runtime client/container, including the rotation helper. Generated derived tags, containers, volumes, keys and scratch sources are removed at exit. The receipt records the code actually executed, dependency-lock hash, immutable images, exact mandatory case identities and cleanup outcome. Uncommitted checkout modifications and ambient test/service filters are not execution inputs.
 
-The reviewed `build/mandatory-tests.json` inventory contains 33 required cases (17 Python tests, 3 Java unit tests, 13 real integration tests). Native counter mismatches, skipped/failed/error cases, duplicate identities, hidden failure-plus-skip and equal-count identity substitutions cannot produce a passing receipt. The contract tests also prove Git exports omit dirty and untracked inputs. To exercise a real failed live gate and teardown, add `--force-preflight-failure`; it must return nonzero and a failed receipt, never a passing result.
+The reviewed `build/mandatory-tests.json` inventory contains 37 required cases (21 Python tests, 3 Java unit tests, 13 real integration tests). Native counter mismatches, skipped/failed/error cases, duplicate identities, hidden failure-plus-skip and equal-count identity substitutions cannot produce a passing receipt. The contract tests also prove Git exports omit dirty and untracked inputs. To exercise a real failed live gate and teardown, add `--force-preflight-failure`; it must return nonzero and a failed receipt, never a passing result.
 
 The recorded clean acceptance run executed storage revision `ff34baee6038a2f8f337f776075eebcde0e6a2fd` and passed all 33 exact mandatory cases with zero skips/failures/errors, despite deliberately supplied ambient test/image filters and the dirty Identity checkout. The forced-preflight-failure run returned exit 1, retained a failed receipt, preserved the original failure and reported successful cleanup. Both isolated workspaces were removed. See `evidence/pinned-acceptance.json`; later evidence-only commits do not change which code revision that receipt proves.
 
 This pins source content, third-party Python distribution hashes and runtime image identities. It is **not bit-identical, hermetic or offline build reproducibility**: Debian apt metadata/compiler packages, Maven transitive artifacts, host Java/Maven and available package registries are external. The direct development runner can use local overrides; the pinned acceptance wrapper clears those inputs and enforces its policy. Compose remains an unexecuted sketch and is not this reproducibility proof.
+
+### Next-release upgrade gate
+
+Primary-source preflight is executable:
+
+```bash
+python3 scripts/probe_keycloak_upgrade.py --report "$TMPDIR/keycloak-upgrade-availability.json"
+```
+
+Exit 2 means **blocked/not tested**, never compatible. The latest recorded check found GitHub's latest released version and Maven Central's newest API version both `26.8.0`, no newer numeric Maven release, and `quay.io/keycloak/keycloak:26.8.1` unavailable (`manifest unknown`, exit 125). It does not guess a nightly build as a released successor. See `evidence/upgrade-gate.json`.
+
+When a newer matching release/API exists, resolve the official container to its immutable digest, review that release's migration notes and the private SPI changes, then run:
+
+```bash
+python3 scripts/pinned_acceptance.py \
+  --source-revision FULL_40_HEX_STORAGE_COMMIT \
+  --candidate-version RELEASED_VERSION \
+  --candidate-image quay.io/keycloak/keycloak@sha256:FULL_64_HEX_DIGEST \
+  --report-dir "$TMPDIR/keycloak-upgrade-report"
+```
+
+The candidate path requires paired numeric-version/digest inputs, pulls the immutable candidate, verifies `kc.sh --version` matches, compiles the provider **and tests** against that API (`-Dkeycloak.version`), and exercises the complete unchanged mandatory inventory against that candidate runtime with mTLS/live Registry/two nodes. The baseline lock remains unchanged; candidate intent, exact digest and source revision are recorded. A runtime-version mismatch fails before live acceptance. No baseline rerun, missing case or skip may be presented as a forward upgrade.
+
+The executable candidate path was smoke-tested on `26.8.0`: all 37 mandatory cases passed, and the receipt explicitly marks `forward_upgrade=false` and `upgrade_compatibility=not-established`. Labelling that same digest as `26.8.1` failed with no mandatory-pass receipt. These controls executed revision `f286a942cc0266877ccd6058bb5a12e2fc3512e9` and removed their isolated workspaces. A genuine successor run remains blocked.
+
+This gate proves extension compile/fresh-start/runtime behavior only. It does **not** establish in-place production database migration, persisted realm/session upgrade, mixed-version/rolling-cluster safety or rollback. Follow the [official upgrade guide](https://www.keycloak.org/docs/latest/upgrading/index.html): review migration changes first, rebuild custom providers before server build, and test backed-up/restored disposable state separately before production upgrade.
 
 This remains a limited prototype, not a global replay or production guarantee. A `podman manifest inspect quay.io/keycloak/keycloak:26.8.1` compatibility preflight returned `manifest unknown` (exit 125); no next-release runtime compatibility is claimed. Full hermetic/bit-identical reproducibility, production workload certificate lifecycle/authorization, complete provider policy implementation and broader failure/partition coverage remain outstanding. The copied `run-single-node-test.sh` is a historical runner and is not verified against the current live-verifier configuration; use the published earlier commit for the original fixture-only baseline.

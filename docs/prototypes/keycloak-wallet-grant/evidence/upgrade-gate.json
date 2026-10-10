@@ -1,0 +1,123 @@
+{
+  "availability": {
+    "checked_at": "2026-10-10T13:53:04.567274+00:00",
+    "baseline": "26.8.0",
+    "verdict": "blocked",
+    "forward_compatibility": "not-tested",
+    "sources": {
+      "release_api": "https://api.github.com/repos/keycloak/keycloak/releases/latest",
+      "maven_metadata": "https://repo.maven.apache.org/maven2/org/keycloak/keycloak-services/maven-metadata.xml",
+      "container_repository": "quay.io/keycloak/keycloak"
+    },
+    "latest_release": "26.8.0",
+    "maven_release": "26.8.0",
+    "newer_maven_versions": [],
+    "probed_candidate": "26.8.1",
+    "manifest_exit": 125,
+    "manifest_failure": "manifest-unknown",
+    "blocker": "No newer matching released Keycloak Maven API and container candidate established"
+  },
+  "baseline_gate_smoke": {
+    "schema": 1,
+    "profile": "pinned-live-prototype",
+    "verdict": "passed",
+    "sources": {
+      "decent-simple-storage": "f286a942cc0266877ccd6058bb5a12e2fc3512e9",
+      "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+      "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
+    },
+    "limits": [
+      "Not bit-identical/hermetic: apt repository, Maven transitive artifacts, host Java/Maven and registry availability remain external.",
+      "No production deployment or partition/failure guarantee."
+    ],
+    "candidate": {
+      "version": "26.8.0",
+      "image": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+      "forward_upgrade": false,
+      "verdict": "passed"
+    },
+    "python_lock_sha256": "2059c4f24c3e4fcfd688accd8518af42576cbb689a4ec269ecd83e0a321b8f94",
+    "mandatory_passed": [
+      "dev.decent.keycloak.grant.GrantClaimContextTest.validatedClaimsAreIsolatedAndConsumedPerKeycloakSession",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.alteredSignatureWithUnchangedClaimsIsRejected",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.assertionTamperingIsRejected",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.authenticatedOwnerKeyRotationRejectsOldAndAcceptsNewKey",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.concurrentRequestsAcrossTwoClusterNodesDoNotCrossContaminateClaims",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.currentKeyMismatchAndUnregisteredAudienceAreRejected",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.grantClaimsRemainBoundToTheirSignedStorageAudience",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.protectedHttpRequestsRecheckCurrentResourceStateWithoutIssuanceCallback",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.registryOutageFailsClosedAndRecoveryNeedsFreshGrant",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.replayedAssertionIsRejectedAcrossNodes",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.signedGrantMintsSignedTokenWithExactClaimsAndNoRefresh",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.simultaneousReplayAcrossNodesIssuesExactlyOneToken",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.verifierJavaClientRejectsMissingUnauthorizedAndUntrustedCredentials",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.walletSignatureMustUseCurrentRegistryKey",
+      "dev.decent.keycloak.grant.VerifierTransportTest.plaintextVerifierIsRejectedBeforeAnyGrantCanBeSent",
+      "dev.decent.keycloak.grant.VerifierTransportTest.urlCredentialsAndQueryAreRejected",
+      "tests.test_pinned_acceptance.test_lie_in_native_counter_is_rejected",
+      "tests.test_pinned_acceptance.test_moving_source_reference_cannot_be_used",
+      "tests.test_pinned_acceptance.test_skip_cannot_be_a_pass",
+      "tests.test_pinned_acceptance.test_substituted_equal_count_inventory_is_rejected",
+      "tests.test_pinned_acceptance.test_valid_exact_inventory_is_accepted",
+      "tests.test_pinned_source.test_duplicate_native_case_is_rejected",
+      "tests.test_pinned_source.test_failure_cannot_be_hidden_by_skipped_outcome",
+      "tests.test_pinned_source.test_source_archive_excludes_uncommitted_and_untracked_files",
+      "tests.test_upgrade_gate.test_baseline_candidate_is_not_a_forward_upgrade",
+      "tests.test_upgrade_gate.test_candidate_tag_cannot_replace_digest_identity",
+      "tests.test_upgrade_gate.test_newer_candidate_is_explicitly_forward",
+      "tests.test_upgrade_gate.test_unpaired_candidate_inputs_are_rejected",
+      "tests.test_verifier.test_exact_identifier_current_key_and_seq_are_returned",
+      "tests.test_verifier.test_registry_key_mismatch_fails_closed",
+      "tests.test_verifier.test_registry_outage_fails_closed",
+      "tests.test_verifier.test_wallet_signature_failure_fails_closed",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure0-timeout]",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure1-transport]",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure2-history_unavailable]",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure3-runtime]",
+      "tests.test_verifier_runtime.test_resolver_executes_on_its_trio_runtime_from_asyncio_http"
+    ],
+    "images": {
+      "keycloak": "516e7d538fcc1a7644fcc0c3e39767f52ef1647b009db561e7f1d8eb685fb690",
+      "registry": "bb1db3580b6e182b788963e7d7a07ba61f213a552a89d254be0013933e5bfbe2",
+      "verifier": "80747fe4cc4fcd75b55a2f5b80f82fc93dea28f5d505539d03b9bc512b61f3ad",
+      "keycloak_base": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+      "python_base": "docker.io/library/python@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe",
+      "postgres_base": "docker.io/library/postgres@sha256:aa90e97ee862e558111d34cfb8b2c4bec768c2b039fb791341686928560263b3",
+      "alpine_base": "docker.io/library/alpine@sha256:3c81aa9a3d770b316568f4499e30461a5cd3fbd7180bd89e28e34894c7845832"
+    },
+    "upgrade_compatibility": "not-established",
+    "workspace_removed": true
+  },
+  "mismatched_candidate_denied": {
+    "schema": 1,
+    "profile": "pinned-live-prototype",
+    "verdict": "failed",
+    "sources": {
+      "decent-simple-storage": "f286a942cc0266877ccd6058bb5a12e2fc3512e9",
+      "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+      "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
+    },
+    "limits": [
+      "Not bit-identical/hermetic: apt repository, Maven transitive artifacts, host Java/Maven and registry availability remain external.",
+      "No production deployment or partition/failure guarantee."
+    ],
+    "candidate": {
+      "version": "26.8.1",
+      "image": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+      "forward_upgrade": true
+    },
+    "python_lock_sha256": "2059c4f24c3e4fcfd688accd8518af42576cbb689a4ec269ecd83e0a321b8f94",
+    "failure_category": "ValueError",
+    "workspace_removed": true
+  },
+  "scope": [
+    "No forward release compatibility claimed: no matching newer released API/runtime found.",
+    "Candidate path compiles provider and test code against candidate Maven API and runs full clean cluster suite on matching digest-pinned runtime.",
+    "Clean new database only: not an in-place schema/realm/cache migration, mixed-version rolling-upgrade or rollback test.",
+    "Nightly is an optional development experiment, not silently substituted for a released candidate."
+  ],
+  "primary_docs": [
+    "https://www.keycloak.org/docs/latest/upgrading/index.html",
+    "https://www.keycloak.org/server/containers"
+  ]
+}
