@@ -1,0 +1,13 @@
+{
+  "sources": {
+    "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+    "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
+  },
+  "images": {
+    "keycloak": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+    "python": "docker.io/library/python@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe",
+    "postgres": "docker.io/library/postgres@sha256:aa90e97ee862e558111d34cfb8b2c4bec768c2b039fb791341686928560263b3",
+    "alpine": "docker.io/library/alpine@sha256:3c81aa9a3d770b316568f4499e30461a5cd3fbd7180bd89e28e34894c7845832"
+  },
+  "scope": "source archives exclude uncommitted changes; Python third-party distributions hash locked; all runtime image identities verified; not bit-identical or offline apt/Maven build"
+}

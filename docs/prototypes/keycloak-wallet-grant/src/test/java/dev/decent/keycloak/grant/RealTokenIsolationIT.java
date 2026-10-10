@@ -203,7 +203,7 @@ class RealTokenIsolationIT {
   @Test @Order(Integer.MAX_VALUE) void authenticatedOwnerKeyRotationRejectsOldAndAcceptsNewKey() throws Exception {
     String scratch=System.getenv("KC_TEST_SCRATCH"), network=System.getenv("KC_TEST_NETWORK"), bootstrap=System.getenv("KC_TEST_BOOTSTRAP");
     assertNotNull(scratch);
-    Process rotation=new ProcessBuilder("podman","run","--rm","--network",network,"-v",scratch+":/scratch","-v",java.nio.file.Path.of("scripts/rotate-live-identity.py").toAbsolutePath()+":/rotate.py:ro","--entrypoint","python","localhost/decent-identity-verifier-prototype:local","/rotate.py","--bootstrap",bootstrap,"--directory","/scratch").redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+    Process rotation=new ProcessBuilder("podman","run","--rm","--network",network,"-v",scratch+":/scratch","-v",java.nio.file.Path.of("scripts/rotate-live-identity.py").toAbsolutePath()+":/rotate.py:ro","--entrypoint","python",System.getenv().getOrDefault("KC_VERIFIER_IMAGE","localhost/decent-identity-verifier-prototype:local"),"/rotate.py","--bootstrap",bootstrap,"--directory","/scratch").redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
     assertTrue(rotation.waitFor(60,java.util.concurrent.TimeUnit.SECONDS),"rotation helper timed out");
     assertEquals(0,rotation.exitValue(),"rotation publication/read-back failed");
     JsonNode report=json.readTree(java.nio.file.Files.readString(java.nio.file.Path.of(scratch,"rotation-report.json")));

@@ -2,6 +2,7 @@
 """Gate a running disposable Registry/verifier topology before Keycloak tests."""
 from __future__ import annotations
 import argparse
+import os
 import base64
 import hashlib
 import json
@@ -36,7 +37,7 @@ def main():
   try:
     deadline = time.monotonic() + 45
     while time.monotonic() < deadline:
-      response = subprocess.run(['podman','run','--rm','--network',args.network,'localhost/decent-registry-prototype:local','get','identity','--host','0.0.0.0','--port','9100','--bootstrap',args.bootstrap,'--owner-name',owner_hex],capture_output=True,text=True,timeout=15)
+      response = subprocess.run(['podman','run','--rm','--network',args.network,os.environ.get('KC_REGISTRY_IMAGE','localhost/decent-registry-prototype:local'),'get','identity','--host','0.0.0.0','--port','9100','--bootstrap',args.bootstrap,'--owner-name',owner_hex],capture_output=True,text=True,timeout=15)
       if response.returncode == 0:
         record = json.loads(response.stdout)
         assert record['owner_name'] == owner_hex and record['owner_public_key'] == public and record['seq'] == 1
@@ -54,7 +55,7 @@ async def main():
   assert r is not None and r.owner_name_hex==sys.argv[1] and r.owner_public_key_hex==sys.argv[3] and r.seq==1
 trio.run(main)
 '''
-    result = subprocess.run(['podman','run','--rm','--network',args.network,'--entrypoint','python','localhost/decent-identity-verifier-prototype:local','-c',code,owner_hex,args.bootstrap,public],capture_output=True,text=True,timeout=20)
+    result = subprocess.run(['podman','run','--rm','--network',args.network,'--entrypoint','python',os.environ.get('KC_VERIFIER_IMAGE','localhost/decent-identity-verifier-prototype:local'),'-c',code,owner_hex,args.bootstrap,public],capture_output=True,text=True,timeout=20)
     assert result.returncode == 0, 'resolver failed'
     report['gates'][stage] = 'passed'
     stage = 'http_verifier'

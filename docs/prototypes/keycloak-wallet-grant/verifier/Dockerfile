@@ -1,15 +1,16 @@
-# Multi-stage throwaway image for the current local decent-identity checkout.
-FROM python:3.12-slim AS build
+ARG PYTHON_BASE
+FROM ${PYTHON_BASE} AS build
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential python3-dev libgmp-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
+COPY decent-simple-storage/docs/prototypes/keycloak-wallet-grant/build/python-requirements.lock /src/requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r /src/requirements.lock
 COPY decent-registry/pyproject.toml decent-registry/README.md /src/decent-registry/
 COPY decent-registry/src /src/decent-registry/src
 COPY decent-identity/pyproject.toml decent-identity/README.md /src/decent-identity/
 COPY decent-identity/src /src/decent-identity/src
-COPY decent-simple-storage/docs/prototypes/keycloak-wallet-grant/verifier/requirements.txt /src/verifier/requirements.txt
-RUN pip install --no-cache-dir /src/decent-registry /src/decent-identity -r /src/verifier/requirements.txt
+RUN pip install --no-cache-dir --no-deps --no-build-isolation /src/decent-registry /src/decent-identity && pip check
 
-FROM python:3.12-slim
+FROM ${PYTHON_BASE}
 COPY --from=build /usr/local /usr/local
 WORKDIR /app
 COPY decent-simple-storage/docs/prototypes/keycloak-wallet-grant/verifier/app.py /app/app.py
