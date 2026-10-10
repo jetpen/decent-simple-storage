@@ -45,6 +45,8 @@ cleanup() {
 rm -rf "$SCRATCH"
 mkdir -p "$SCRATCH"
 trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 JAVA_HOME=${JAVA_HOME:-$(mise where java@21.0.2)}
 export JAVA_HOME PATH="$JAVA_HOME/bin:$PATH"
 unset JAVA_TOOL_OPTIONS _JAVA_OPTIONS JDK_JAVA_OPTIONS

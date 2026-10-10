@@ -45,7 +45,7 @@ For the tight Registry-only reproducer, using the sibling Registry environment:
 /home/ben/projects/decent-registry/.venv/bin/python scripts/check-registry-fixture.py --report "$TMPDIR/registry-fixture.json"
 ```
 
-Build the Registry and verifier images first with the Dockerfiles in this directory; the preflight runner does this automatically. The local `decent-identity` checkout currently has a pre-existing uncommitted dependency declaration and `uv.lock`; the image explicitly installs both sibling packages, and reports record source revisions/dirty state rather than claiming clean pinned builds.
+The local `decent-identity` checkout still has a pre-existing uncommitted dependency declaration and `uv.lock`, left untouched. The pinned acceptance entry point below exports its exact committed revision instead; a passing clean run proves that dirty metadata is not required. Direct worktree runs are development-only. The old `check-registry-fixture.py` standalone command requires prebuilt legacy local tags; the pinned acceptance entry point and its integrated preflight use immutable image IDs and are the current verification path.
 
 ### Diagnosed integration defects
 
@@ -77,4 +77,20 @@ Live preflight proves missing client certificate, rogue-CA client, wrong server 
 
 This authenticates possession of a certificate issued by the dedicated client CA, not arbitrary CN-based workload authorization. Production CA issuance/rotation/revocation, least-privilege workload policies, certificate reload, end-to-end external TLS, and trust-boundary review remain outstanding. Other local test links (token endpoints/DB/Registry) retain their isolated test configuration. The Compose file is a parsing-checked topology sketch requiring `KC_TLS_ROOT`; the direct Podman runner is the executed acceptance path.
 
-This remains a limited prototype, not a global replay or production guarantee. A `podman manifest inspect quay.io/keycloak/keycloak:26.8.1` compatibility preflight returned `manifest unknown` (exit 125); no next-release runtime compatibility is claimed. Clean dependency/image pinning, production workload certificate lifecycle/authorization, complete provider policy implementation and broader failure/partition coverage remain outstanding. The copied `run-single-node-test.sh` is a historical runner and is not verified against the current live-verifier configuration; use the published earlier commit for the original fixture-only baseline.
+### Clean revision-pinned acceptance
+
+From this directory:
+
+```bash
+python3 scripts/pinned_acceptance.py --source-revision FULL_40_HEX_STORAGE_COMMIT --report-dir "$TMPDIR/kc-pinned-report"
+```
+
+Requires Git, uv, Podman, OpenSSL, Java 21/Maven and the named local repositories with the selected commits available. The command rejects moving refs, exports committed Git archives into a private temporary sibling layout, installs an isolated Python 3.12 environment from a hash-locked dependency list, and builds source packages with `--no-deps --no-build-isolation`. Clean Identity metadata has no declared runtime dependencies; the prototype lock explicitly supplies those dependencies without editing that repo.
+
+`build/pinned-inputs.json` pins Registry/Identity commits and base Keycloak/Python/PostgreSQL/Alpine OCI digests. Each run creates unique derived-image tags, records immutable image IDs, and passes those IDs to every runtime client/container, including the rotation helper. Generated derived tags, containers, volumes, keys and scratch sources are removed at exit. The receipt records the code actually executed, dependency-lock hash, immutable images, exact mandatory case identities and cleanup outcome. Uncommitted checkout modifications and ambient test/service filters are not execution inputs.
+
+The reviewed `build/mandatory-tests.json` inventory contains 33 required cases (17 Python tests, 3 Java unit tests, 13 real integration tests). Native counter mismatches, skipped/failed/error cases, duplicate identities, hidden failure-plus-skip and equal-count identity substitutions cannot produce a passing receipt. The contract tests also prove Git exports omit dirty and untracked inputs. To exercise a real failed live gate and teardown, add `--force-preflight-failure`; it must return nonzero and a failed receipt, never a passing result.
+
+This pins source content, third-party Python distribution hashes and runtime image identities. It is **not bit-identical, hermetic or offline build reproducibility**: Debian apt metadata/compiler packages, Maven transitive artifacts, host Java/Maven and available package registries are external. The direct development runner can use local overrides; the pinned acceptance wrapper clears those inputs and enforces its policy. Compose remains an unexecuted sketch and is not this reproducibility proof.
+
+This remains a limited prototype, not a global replay or production guarantee. A `podman manifest inspect quay.io/keycloak/keycloak:26.8.1` compatibility preflight returned `manifest unknown` (exit 125); no next-release runtime compatibility is claimed. Full hermetic/bit-identical reproducibility, production workload certificate lifecycle/authorization, complete provider policy implementation and broader failure/partition coverage remain outstanding. The copied `run-single-node-test.sh` is a historical runner and is not verified against the current live-verifier configuration; use the published earlier commit for the original fixture-only baseline.
