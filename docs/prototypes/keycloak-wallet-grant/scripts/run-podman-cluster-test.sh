@@ -50,6 +50,8 @@ trap 'exit 130' INT
 JAVA_HOME=${JAVA_HOME:-$(mise where java@21.0.2)}
 export JAVA_HOME PATH="$JAVA_HOME/bin:$PATH"
 unset JAVA_TOOL_OPTIONS _JAVA_OPTIONS JDK_JAVA_OPTIONS
+MAVEN_VERSION_ARGS=()
+if [ -n "${KC_API_VERSION:-}" ]; then MAVEN_VERSION_ARGS=("-Dkeycloak.version=$KC_API_VERSION"); fi
 cd "$ROOT"
 if [ -n "$KEY_PATH" ]; then cp "$KEY_PATH" "$SCRATCH/issuer.key"; else openssl genpkey -algorithm ED25519 -out "$SCRATCH/issuer.key" >/dev/null 2>&1; fi
 cp "$ROOT/container/realm.json" "$SCRATCH/realm.json"
@@ -75,7 +77,7 @@ mkdir -m 700 "$SCRATCH/tls-verifier"
 cp "$SCRATCH/tls/server.crt" "$SCRATCH/tls-verifier/server.crt"
 cp "$SCRATCH/tls/server.key" "$SCRATCH/tls-verifier/server.key"
 cp "$SCRATCH/tls/client-ca.crt" "$SCRATCH/tls-verifier/client-ca.crt"
-env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= mvn -B -DskipTests package
+env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= mvn -B "${MAVEN_VERSION_ARGS[@]}" -DskipTests package
 eval "$(python3 - "$ROOT/build/pinned-inputs.json" <<'PINS'
 import json,sys,shlex
 for name,reference in json.load(open(sys.argv[1]))['images'].items():
@@ -157,4 +159,4 @@ export KC_REGISTRY_CONTAINER="$STACK-registry-1"
 export KC_TEST_TLS_DIR="$SCRATCH/tls"
 export KC_TEST_SCRATCH="$SCRATCH" KC_TEST_NETWORK="$NETWORK" KC_TEST_BOOTSTRAP="$BOOT"
 export KC_URL=http://127.0.0.1:18080 KC_URL_2=http://127.0.0.1:18081 VERIFIER_URL=http://verifier:8000 KC_CLIENT_SECRET=prototype-secret KC_WALLET_PUBLIC_KEY_HEX="$WALLET_PUB"
-env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= JAVA_HOME="$JAVA_HOME" PATH="$PATH" mvn -B -Dtest=GrantClaimContextTest,VerifierTransportTest -Dit.test=RealTokenIsolationIT -DfailIfNoTests=false verify
+env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= JAVA_HOME="$JAVA_HOME" PATH="$PATH" mvn -B "${MAVEN_VERSION_ARGS[@]}" -Dtest=GrantClaimContextTest,VerifierTransportTest -Dit.test=RealTokenIsolationIT -DfailIfNoTests=false verify
