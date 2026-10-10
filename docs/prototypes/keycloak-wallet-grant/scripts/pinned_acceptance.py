@@ -31,6 +31,18 @@ def validate_candidate(version,image):
   return {'version':version,'image':image,'forward_upgrade':tuple(map(int,version.split('.')))>(26,8,0)}
 
 
+def compatibility_scope(candidate, *, passed):
+  """A fresh database run cannot certify a deployment migration strategy."""
+  return {
+    'fresh_start_conformance':'passed' if passed else 'not-established',
+    'forward_release_fresh_start':('passed' if passed else 'not-established') if candidate and candidate['forward_upgrade'] else 'not-tested',
+    'persisted_state_migration':'not-tested',
+    'mixed_version_rolling':'not-tested',
+    'rollback_restore':'not-tested',
+    'optimized_startup':'not-tested',
+  }
+
+
 def validate_reports(paths,expected):
   found=[]
   for path in paths:
@@ -144,11 +156,11 @@ def main():
       receipt['images']=json.loads((args.report_dir/'images.json').read_text())
       receipt['verdict']='passed'
       if candidate:receipt['candidate']['verdict']='passed'
-      receipt['upgrade_compatibility']='forward-tested' if candidate and candidate['forward_upgrade'] else 'not-established'
     except Exception as exc:
       receipt['failure_category']=type(exc).__name__
   receipt['workspace_removed']=not workspace.exists()
   if not receipt['workspace_removed']:receipt['verdict']='failed'
+  receipt['compatibility_scope']=compatibility_scope(candidate,passed=receipt['verdict']=='passed')
   receipt_path.write_text(json.dumps(receipt,indent=2)+'\n')
   print(json.dumps({'verdict':receipt['verdict'],'mandatory_count':len(receipt.get('mandatory_passed',[])),'workspace_removed':receipt['workspace_removed'],'failure_category':receipt.get('failure_category')}))
   return 0 if receipt['verdict']=='passed' else 1

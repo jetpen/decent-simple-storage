@@ -19,3 +19,21 @@ def test_baseline_candidate_is_not_a_forward_upgrade():
 def test_newer_candidate_is_explicitly_forward():
   result=module.validate_candidate('26.8.1','quay.io/keycloak/keycloak@sha256:'+'a'*64)
   assert result['forward_upgrade'] is True
+
+
+@pytest.mark.parametrize('candidate', [None, {'forward_upgrade':False}, {'forward_upgrade':True}])
+def test_fresh_start_success_never_claims_deployment_upgrade_safety(candidate):
+  scope=module.compatibility_scope(candidate,passed=True)
+  assert scope['fresh_start_conformance']=='passed'
+  assert scope['persisted_state_migration']=='not-tested'
+  assert scope['mixed_version_rolling']=='not-tested'
+  assert scope['rollback_restore']=='not-tested'
+  assert scope['optimized_startup']=='not-tested'
+  assert scope['forward_release_fresh_start']==('passed' if candidate and candidate['forward_upgrade'] else 'not-tested')
+  assert 'upgrade_compatibility' not in scope
+
+
+def test_failed_candidate_cannot_claim_conformance():
+  scope=module.compatibility_scope({'forward_upgrade':True},passed=False)
+  assert scope['fresh_start_conformance']=='not-established'
+  assert scope['forward_release_fresh_start']=='not-established'
