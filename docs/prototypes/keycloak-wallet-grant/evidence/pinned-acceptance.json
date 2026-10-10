@@ -1,0 +1,83 @@
+{
+  "passing_run": {
+    "schema": 1,
+    "profile": "pinned-live-prototype",
+    "verdict": "passed",
+    "sources": {
+      "decent-simple-storage": "ff34baee6038a2f8f337f776075eebcde0e6a2fd",
+      "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+      "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
+    },
+    "limits": [
+      "Not bit-identical/hermetic: apt repository, Maven transitive artifacts, host Java/Maven and registry availability remain external.",
+      "No production deployment or partition/failure guarantee."
+    ],
+    "python_lock_sha256": "2059c4f24c3e4fcfd688accd8518af42576cbb689a4ec269ecd83e0a321b8f94",
+    "mandatory_passed": [
+      "dev.decent.keycloak.grant.GrantClaimContextTest.validatedClaimsAreIsolatedAndConsumedPerKeycloakSession",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.alteredSignatureWithUnchangedClaimsIsRejected",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.assertionTamperingIsRejected",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.authenticatedOwnerKeyRotationRejectsOldAndAcceptsNewKey",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.concurrentRequestsAcrossTwoClusterNodesDoNotCrossContaminateClaims",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.currentKeyMismatchAndUnregisteredAudienceAreRejected",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.grantClaimsRemainBoundToTheirSignedStorageAudience",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.protectedHttpRequestsRecheckCurrentResourceStateWithoutIssuanceCallback",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.registryOutageFailsClosedAndRecoveryNeedsFreshGrant",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.replayedAssertionIsRejectedAcrossNodes",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.signedGrantMintsSignedTokenWithExactClaimsAndNoRefresh",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.simultaneousReplayAcrossNodesIssuesExactlyOneToken",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.verifierJavaClientRejectsMissingUnauthorizedAndUntrustedCredentials",
+      "dev.decent.keycloak.grant.RealTokenIsolationIT.walletSignatureMustUseCurrentRegistryKey",
+      "dev.decent.keycloak.grant.VerifierTransportTest.plaintextVerifierIsRejectedBeforeAnyGrantCanBeSent",
+      "dev.decent.keycloak.grant.VerifierTransportTest.urlCredentialsAndQueryAreRejected",
+      "tests.test_pinned_acceptance.test_lie_in_native_counter_is_rejected",
+      "tests.test_pinned_acceptance.test_moving_source_reference_cannot_be_used",
+      "tests.test_pinned_acceptance.test_skip_cannot_be_a_pass",
+      "tests.test_pinned_acceptance.test_substituted_equal_count_inventory_is_rejected",
+      "tests.test_pinned_acceptance.test_valid_exact_inventory_is_accepted",
+      "tests.test_pinned_source.test_duplicate_native_case_is_rejected",
+      "tests.test_pinned_source.test_failure_cannot_be_hidden_by_skipped_outcome",
+      "tests.test_pinned_source.test_source_archive_excludes_uncommitted_and_untracked_files",
+      "tests.test_verifier.test_exact_identifier_current_key_and_seq_are_returned",
+      "tests.test_verifier.test_registry_key_mismatch_fails_closed",
+      "tests.test_verifier.test_registry_outage_fails_closed",
+      "tests.test_verifier.test_wallet_signature_failure_fails_closed",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure0-timeout]",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure1-transport]",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure2-history_unavailable]",
+      "tests.test_verifier_diagnostics.test_safe_internal_failure_category[failure3-runtime]",
+      "tests.test_verifier_runtime.test_resolver_executes_on_its_trio_runtime_from_asyncio_http"
+    ],
+    "images": {
+      "keycloak": "6a484c56af9253cd8ba50af0a9dfbe46d92ecb0ed949ab2a2b2b8ae311a81707",
+      "registry": "acf887e219fce24bfcf451a9f1b4910913aec4d998e9ef24363a973bac66e74d",
+      "verifier": "dcb972b61f2de547cca8d869122281d30815499dc5263738657a2d638cfa9894",
+      "keycloak_base": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+      "python_base": "docker.io/library/python@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe",
+      "postgres_base": "docker.io/library/postgres@sha256:aa90e97ee862e558111d34cfb8b2c4bec768c2b039fb791341686928560263b3",
+      "alpine_base": "docker.io/library/alpine@sha256:3c81aa9a3d770b316568f4499e30461a5cd3fbd7180bd89e28e34894c7845832"
+    },
+    "workspace_removed": true
+  },
+  "failed_live_gate": {
+    "schema": 1,
+    "profile": "pinned-live-prototype",
+    "verdict": "failed",
+    "sources": {
+      "decent-simple-storage": "ff34baee6038a2f8f337f776075eebcde0e6a2fd",
+      "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+      "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
+    },
+    "limits": [
+      "Not bit-identical/hermetic: apt repository, Maven transitive artifacts, host Java/Maven and registry availability remain external.",
+      "No production deployment or partition/failure guarantee."
+    ],
+    "python_lock_sha256": "2059c4f24c3e4fcfd688accd8518af42576cbb689a4ec269ecd83e0a321b8f94",
+    "failure_category": "RuntimeError",
+    "workspace_removed": true
+  },
+  "failed_cleanup": "original_exit=1 cleanup_failed=0",
+  "positive_cleanup": "original_exit=0 cleanup_failed=0",
+  "ambient_filter_probe": "passing run supplied PYTEST_ADDOPTS=-k nonexistent and bad image environment overrides; wrapper removed them and ran all exact mandatory cases",
+  "dirty_sibling_input": "Identity checkout had modified pyproject.toml and untracked uv.lock; both left untouched and excluded by committed source export"
+}
