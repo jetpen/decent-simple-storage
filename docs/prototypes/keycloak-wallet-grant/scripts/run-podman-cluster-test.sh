@@ -28,6 +28,7 @@ cleanup() {
   for volume in "$VOL_REG" "$VOL_BOOT" "$VOL_DB"; do
     if podman volume exists "$volume"; then podman volume rm "$volume" >/dev/null 2>&1 || cleanup_failed=1; fi
   done
+  if [ -f "$SCRATCH/rotation-report.json" ]; then cp "$SCRATCH/rotation-report.json" "$REPORT_DIR/rotation.json"; fi
   rm -rf "$SCRATCH" || cleanup_failed=1
   [ ! -e "$SCRATCH" ] || cleanup_failed=1
   printf 'original_exit=%s cleanup_failed=%s\n' "$original_status" "$cleanup_failed" > "$REPORT_DIR/cleanup.txt"
@@ -112,5 +113,6 @@ python3 "$ROOT/scripts/check-keycloak-cluster.py" --node "$STACK-keycloak1-1" --
 # Only the test JVM needs the disposable signing key; never print it.
 export KC_ASSERTION_PRIVATE_KEY="$(<"$SCRATCH/owner.key")"
 export KC_REGISTRY_CONTAINER="$STACK-registry-1"
+export KC_TEST_SCRATCH="$SCRATCH" KC_TEST_NETWORK="$NETWORK" KC_TEST_BOOTSTRAP="$BOOT"
 export KC_URL=http://127.0.0.1:18080 KC_URL_2=http://127.0.0.1:18081 VERIFIER_URL=http://verifier:8000 KC_CLIENT_SECRET=prototype-secret KC_WALLET_PUBLIC_KEY_HEX="$WALLET_PUB"
 env -u MAVEN_OPTS -u JAVA_TOOL_OPTIONS -u _JAVA_OPTIONS -u JDK_JAVA_OPTIONS MAVEN_OPTS= JAVA_HOME="$JAVA_HOME" PATH="$PATH" mvn -B -Dtest=GrantClaimContextTest -Dit.test=RealTokenIsolationIT -DfailIfNoTests=false verify

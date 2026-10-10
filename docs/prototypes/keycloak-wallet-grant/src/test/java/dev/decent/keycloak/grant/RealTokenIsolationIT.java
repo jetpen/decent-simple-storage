@@ -21,6 +21,7 @@ import org.keycloak.jose.jws.JWSBuilder;
 import org.keycloak.representations.AccessToken;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RealTokenIsolationIT {
   private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
   private final ObjectMapper json=new ObjectMapper();
@@ -101,6 +102,13 @@ class RealTokenIsolationIT {
     Map<String,Object> wrongAudience=new HashMap<>(claims(UUID.randomUUID().toString())); wrongAudience.put("storage_aud","https://unregistered.example.test");
     assertEquals(400,exchange(assertion(wrongAudience)).statusCode());
   }
+  @Test void alteredSignatureWithUnchangedClaimsIsRejected() throws Exception {
+    String[] parts=assertion(claims(UUID.randomUUID().toString())).split("\\.");
+    byte[] signature=Base64.getUrlDecoder().decode(parts[2]);signature[0]^=1;
+    parts[2]=Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
+    var rejected=exchange(String.join(".",parts));
+    assertEquals(400,rejected.statusCode());assertFalse(json.readTree(rejected.body()).hasNonNull("access_token"));
+  }
   @Test void assertionTamperingIsRejected() throws Exception {
     String signed=assertion(claims(UUID.randomUUID().toString()));
     String[] parts=signed.split("\\.");byte[] payload=Base64.getUrlDecoder().decode(parts[1]);payload[payload.length/2]^=1;parts[1]=Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
@@ -126,6 +134,79 @@ class RealTokenIsolationIT {
       for (var response:responses) if(response.statusCode()==200) assertIssuedClaims(response,expected);
     }
   }
+  @Test void protectedHttpRequestsRecheckCurrentResourceStateWithoutIssuanceCallback() throws Exception {
+    var approved=new java.util.concurrent.atomic.AtomicBoolean(true);
+    var exists=new java.util.concurrent.atomic.AtomicBoolean(true);
+    var quota=new java.util.concurrent.atomic.AtomicBoolean(true);
+    var revoked=new java.util.concurrent.atomic.AtomicBoolean(false);
+    var available=new java.util.concurrent.atomic.AtomicBoolean(true);
+    var calls=new java.util.concurrent.atomic.AtomicInteger();
+    var resource=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+    resource.createContext("/object",request->{
+      calls.incrementAndGet();int status=401;
+      String auth=request.getRequestHeaders().getFirst("Authorization");
+      if(auth!=null && auth.startsWith("Bearer ")) {
+        try {
+          String jwt=auth.substring(7);JsonNode token=decodePayload(jwt);
+          assertTrue(List.of(issuer,System.getenv("KC_URL_2")+"/realms/decent").contains(token.get("iss").asText()));
+          verifyKeycloakSignature(jwt);
+          boolean aud=token.get("aud").isArray()?json.convertValue(token.get("aud"),List.class).contains("https://storage.example.test/instance/alpha"):token.get("aud").asText().equals("https://storage.example.test/instance/alpha");
+          assertTrue(aud && token.get("exp").asLong()>System.currentTimeMillis()/1000);
+          assertEquals("mailto:alice@example.org",token.get("sub").asText());
+          boolean scope=token.get("storage_object_digest").asText().equals("sha256:"+"a".repeat(64)) && token.get("storage_purpose").asText().equals("profile-update") && json.convertValue(token.get("storage_actions"),List.class).contains("read");
+          status=!available.get()?503:(!scope || !approved.get() || !exists.get() || !quota.get() || revoked.get())?403:200;
+        } catch(Throwable rejected) { status=401; }
+      }
+      request.getResponseHeaders().set("Cache-Control","no-store");
+      request.sendResponseHeaders(status,-1);request.close();
+    });
+    resource.start();
+    try {
+      var response=exchange(assertion(claims(UUID.randomUUID().toString())));
+      assertEquals(200,response.statusCode());assertEquals(0,calls.get(),"token issuance must not call Storage");
+      String jwt=json.readTree(response.body()).get("access_token").asText();
+      String url="http://127.0.0.1:"+resource.getAddress().getPort()+"/object";
+      java.util.function.Supplier<HttpResponse<String>> fetch=()->{
+        try{return http.send(HttpRequest.newBuilder(URI.create(url)).header("Authorization","Bearer "+jwt).GET().build(),HttpResponse.BodyHandlers.ofString());}
+        catch(Exception e){throw new RuntimeException(e);}
+      };
+      assertEquals(200,fetch.get().statusCode());
+      approved.set(false);assertEquals(403,fetch.get().statusCode());approved.set(true);
+      exists.set(false);assertEquals(403,fetch.get().statusCode());exists.set(true);
+      quota.set(false);assertEquals(403,fetch.get().statusCode());quota.set(true);
+      revoked.set(true);assertEquals(403,fetch.get().statusCode());
+      available.set(false);assertEquals(503,fetch.get().statusCode());available.set(true);
+      var finalResponse=fetch.get();assertEquals(403,finalResponse.statusCode(),"recovery must not revive revoked consent");
+      assertEquals("no-store",finalResponse.headers().firstValue("Cache-Control").orElseThrow());
+      assertEquals(7,calls.get());
+    } finally {resource.stop(0);}
+  }
+  @Test @Order(Integer.MAX_VALUE) void authenticatedOwnerKeyRotationRejectsOldAndAcceptsNewKey() throws Exception {
+    String scratch=System.getenv("KC_TEST_SCRATCH"), network=System.getenv("KC_TEST_NETWORK"), bootstrap=System.getenv("KC_TEST_BOOTSTRAP");
+    assertNotNull(scratch);
+    Process rotation=new ProcessBuilder("podman","run","--rm","--network",network,"-v",scratch+":/scratch","-v",java.nio.file.Path.of("scripts/rotate-live-identity.py").toAbsolutePath()+":/rotate.py:ro","--entrypoint","python","localhost/decent-identity-verifier-prototype:local","/rotate.py","--bootstrap",bootstrap,"--directory","/scratch").redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+    assertTrue(rotation.waitFor(60,java.util.concurrent.TimeUnit.SECONDS),"rotation helper timed out");
+    assertEquals(0,rotation.exitValue(),"rotation publication/read-back failed");
+    JsonNode report=json.readTree(java.nio.file.Files.readString(java.nio.file.Path.of(scratch,"rotation-report.json")));
+    assertEquals("passed",report.get("status").asText());assertTrue(report.get("exact_remote_candidate").asBoolean());assertTrue(report.get("fresh_history_resolution").asBoolean());
+    var denied=exchange(assertion(claims(UUID.randomUUID().toString())));
+    assertEquals(400,denied.statusCode());assertFalse(json.readTree(denied.body()).hasNonNull("access_token"));
+    String pem=java.nio.file.Files.readString(java.nio.file.Path.of(scratch,"rotation-key-0.pem"));
+    String raw=pem.replaceAll("-----[^-]+-----", "").replaceAll("\\s", "");
+    assertionKey=KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(raw)));
+    String publicKey=report.get("new_public_key_hex").asText();
+    for(String endpoint:List.of(tokenUrl,System.getenv("KC_URL_2")+"/realms/decent/protocol/openid-connect/token")) {
+      Map<String,Object> expected=new HashMap<>(claims(UUID.randomUUID().toString()));expected.put("wallet_public_key",publicKey);
+      var response=exchangeAt(endpoint,assertion(expected));
+      assertEquals(200,response.statusCode(),"new current key should mint token after legitimate rotation");
+      JsonNode envelope=json.readTree(response.body());assertFalse(envelope.hasNonNull("refresh_token"));
+      String jwt=envelope.get("access_token").asText();verifyKeycloakSignature(jwt);
+      JsonNode token=decodePayload(jwt);assertEquals(2,token.get("identity_registry_seq").asInt());
+      assertEquals("mailto:alice@example.org",token.get("sub").asText());
+      assertEquals("ed25519:"+HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(HexFormat.of().parseHex(publicKey))),token.get("owner_key_fingerprint").asText());
+      assertEquals(expected.get("grant_jti"),token.get("wallet_grant_jti").asText());
+    }
+  }
   private List<HttpResponse<String>> race(String a,String b) throws Exception {
     var barrier=new java.util.concurrent.CyclicBarrier(3);
     String endpoint2=System.getenv("KC_URL_2")+"/realms/decent/protocol/openid-connect/token";
@@ -143,6 +224,8 @@ class RealTokenIsolationIT {
     JsonNode token=decodePayload(jwt);
     assertEquals("mailto:alice@example.org",token.get("sub").asText());
     assertEquals(expected.get("storage_aud"),token.get("storage_aud").asText());
+    assertNotNull(token.get("aud"),"standard aud must bind the Storage resource server");
+    assertTrue(token.get("aud").isArray() ? json.convertValue(token.get("aud"),List.class).contains(expected.get("storage_aud")) : token.get("aud").asText().equals(expected.get("storage_aud")),"standard aud must bind the Storage resource server");
     assertEquals(expected.get("object_digest"),token.get("storage_object_digest").asText());
     assertEquals(json.valueToTree(expected.get("actions")),token.get("storage_actions"));
     assertEquals(expected.get("purpose"),token.get("storage_purpose").asText());

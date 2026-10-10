@@ -1,10 +1,14 @@
 {
   "keycloak_version": "26.8.0",
-  "tests": 9,
+  "tests": 12,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
   "cases": [
+    {
+      "name": "alteredSignatureWithUnchangedClaimsIsRejected",
+      "passed": true
+    },
     {
       "name": "simultaneousReplayAcrossNodesIssuesExactlyOneToken",
       "passed": true
@@ -19,6 +23,10 @@
     },
     {
       "name": "replayedAssertionIsRejectedAcrossNodes",
+      "passed": true
+    },
+    {
+      "name": "protectedHttpRequestsRecheckCurrentResourceStateWithoutIssuanceCallback",
       "passed": true
     },
     {
@@ -40,31 +48,47 @@
     {
       "name": "concurrentRequestsAcrossTwoClusterNodesDoNotCrossContaminateClaims",
       "passed": true
+    },
+    {
+      "name": "authenticatedOwnerKeyRotationRejectsOldAndAcceptsNewKey",
+      "passed": true
     }
   ],
   "scope": {
     "distinct_grant_barrier_rounds": 8,
     "identical_assertion_replay_barrier_rounds": 12,
     "registry_outage": "paused test Registry then restored; no token while unavailable; fresh grant succeeded",
-    "owner_key_rotation": "not yet tested",
-    "storage_resource_enforcement": "not yet tested",
-    "next_version": "not yet tested"
+    "owner_key_rotation": "live predecessor-authorized legacy seq1 to v1 seq2; exact direct remote read and fresh history resolution; old key rejected, new key tokens on both nodes",
+    "storage_resource_enforcement": "throwaway HTTP resource server with in-memory current policy flags; real issued token/JWKS verification, 7 protected requests; not production Storage or quota accounting",
+    "standard_audience": "actual aud and storage_aud bind the verified Storage instance",
+    "next_version": "26.8.1 manifest unknown, exit125; runtime compatibility not tested",
+    "signature_authority": "private verifier validates exact JWT signature against current Registry owner key; Keycloak core validates algorithm/time/audience/replay/link; stock IdP signature implementation not inherited"
+  },
+  "rotation": {
+    "status": "passed",
+    "scope": "one configured Registry peer; not global currentness",
+    "unauthorized_rotation_locally_rejected": true,
+    "exact_remote_candidate": true,
+    "fresh_history_resolution": true,
+    "seq": 2,
+    "state_hash": "66e82c3c88c8708a02e13bea7f3b86f88f377ae8401c36dbd7bb445f161dc5cb",
+    "new_public_key_hex": "09666d3b88f56f143c1ab109ea2b87e52d254dde38fd454449294c323e42cf40"
   },
   "cluster": {
     "passed": true,
     "nodes": {
-      "decent-kc-prototype-3937266-keycloak1-1": {
-        "view": "[460c02f7c5a4-30840(v=16.0.15)|1]",
+      "decent-kc-prototype-3966594-keycloak1-1": {
+        "view": "[26f9db682d99-5866(v=16.0.15)|1]",
         "members": [
-          "460c02f7c5a4-30840(v=16.0.15)",
-          "47b3faacd546-3019(v=16.0.15)"
+          "26f9db682d99-5866(v=16.0.15)",
+          "663b7877b2d5-2672(v=16.0.15)"
         ]
       },
-      "decent-kc-prototype-3937266-keycloak2-1": {
-        "view": "[460c02f7c5a4-30840(v=16.0.15)|1]",
+      "decent-kc-prototype-3966594-keycloak2-1": {
+        "view": "[26f9db682d99-5866(v=16.0.15)|1]",
         "members": [
-          "460c02f7c5a4-30840(v=16.0.15)",
-          "47b3faacd546-3019(v=16.0.15)"
+          "26f9db682d99-5866(v=16.0.15)",
+          "663b7877b2d5-2672(v=16.0.15)"
         ]
       }
     }
