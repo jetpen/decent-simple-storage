@@ -1,6 +1,7 @@
 package dev.decent.keycloak.grant;
 
 import java.util.List;
+import java.util.Arrays;
 import java.util.Map;
 import org.keycloak.broker.jwtauthorizationgrant.JWTAuthorizationGrantIdentityProviderConfig;
 import org.keycloak.broker.jwtauthorizationgrant.JWTAuthorizationGrantConfig;
@@ -9,6 +10,7 @@ import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.IdentityProviderType;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.provider.ProviderConfigProperty;
+import org.keycloak.broker.provider.IdentityBrokerException;
 import org.keycloak.services.Urls;
 
 /** Pinned 26.8 prototype IdP. Registry implementation is deliberately injected in the harness. */
@@ -24,11 +26,19 @@ public final class DecentGrantIdentityProviderFactory extends AbstractIdentityPr
     config.getConfig().putIfAbsent(JWTAuthorizationGrantConfig.JWT_AUTHORIZATION_GRANT_ASSERTION_SIGNATURE_ALG, "EdDSA");
     config.getConfig().putIfAbsent(JWTAuthorizationGrantConfig.JWT_AUTHORIZATION_GRANT_ALLOWED_CLOCK_SKEW, "0");
     config.getConfig().putIfAbsent(JWTAuthorizationGrantConfig.JWT_AUTHORIZATION_GRANT_LIMIT_ACCESS_TOKEN_EXP, "true");
-    return new DecentGrantIdentityProvider(session, config, List.of(
-      Urls.realmIssuer(session.getContext().getUri().getBaseUri(), session.getContext().getRealm().getName()),
-      Urls.tokenEndpoint(session.getContext().getUri().getBaseUri(), session.getContext().getRealm().getName()).toString()));
+    String verifierUrl = model.getConfig().getOrDefault("verifierUrl", "");
+    if (verifierUrl.isBlank()) throw new IdentityBrokerException("verifierUrl must be configured; fixture mode is test-only");
+    String audienceConfig = model.getConfig().getOrDefault("jwtGrantAudiences", "");
+    List<String> audiences = Arrays.stream(audienceConfig.split(",")).map(String::trim).filter(v -> !v.isEmpty()).toList();
+    if (audiences.isEmpty()) throw new IdentityBrokerException("registered JWT grant audiences must be configured");
+    return new DecentGrantIdentityProvider(session, config, audiences,
+      IdentityRegistryVerifier.remote(verifierUrl, Arrays.stream(model.getConfig().getOrDefault("storageAudiences", "").split(",")).map(String::trim).filter(v -> !v.isEmpty()).collect(java.util.stream.Collectors.toUnmodifiableSet())));
   }
   @Override public IdentityProviderModel createConfig() { return new JWTAuthorizationGrantIdentityProviderConfig(); }
   @Override public Map<String,String> parseConfig(KeycloakSession session, String config) { throw new UnsupportedOperationException("use Admin configuration model"); }
-  @Override public List<ProviderConfigProperty> getConfigProperties() { return List.of(); }
+  @Override public List<ProviderConfigProperty> getConfigProperties() {
+    ProviderConfigProperty verifier = new ProviderConfigProperty(); verifier.setName("verifierUrl"); verifier.setLabel("Internal Identity verifier URL"); verifier.setType(ProviderConfigProperty.STRING_TYPE); verifier.setHelpText("Private test verifier container URL; never user supplied.");
+    ProviderConfigProperty audiences = new ProviderConfigProperty(); audiences.setName("storageAudiences"); audiences.setLabel("Registered Storage audiences"); audiences.setType(ProviderConfigProperty.STRING_TYPE); audiences.setHelpText("Comma-separated operator-configured exact Storage audience values.");
+    return List.of(verifier,audiences);
+  }
 }

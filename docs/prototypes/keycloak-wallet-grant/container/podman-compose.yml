@@ -1,0 +1,112 @@
+services:
+  registry:
+    build: ../registry
+    image: localhost/decent-registry-prototype:local
+    command: ["node", "--host", "0.0.0.0", "--port", "9000", "--datastore-path", "/var/lib/decent/registry", "-v"]
+    volumes:
+      - registry-data:/var/lib/decent/registry
+      - registry-bootstrap:/bootstrap
+    networks:
+      decent-test:
+        aliases: [registry]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket;socket.create_connection(('127.0.0.1',9000),2).close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  bootstrap-init:
+    image: docker.io/library/alpine:3.21
+    command: ["/bin/sh", "-ec", "while [ ! -s /bootstrap/bootstrap.multiaddr ]; do sleep 1; done"]
+    volumes:
+      - registry-bootstrap:/bootstrap:ro
+    networks: [decent-test]
+    depends_on: [registry]
+  verifier:
+    build:
+      context: ../../../..
+      dockerfile: decent-simple-storage/docs/prototypes/keycloak-wallet-grant/verifier/Dockerfile
+    image: localhost/decent-identity-verifier-prototype:local
+    entrypoint: ["/bin/sh", "-ec"]
+    command: >-
+      while [ ! -s /bootstrap/bootstrap.multiaddr ]; do sleep 1; done;
+      uvicorn app:app --host 0.0.0.0 --port 8000
+    environment:
+      REGISTRY_HOST: 0.0.0.0
+      REGISTRY_CLIENT_PORT: "0"
+      REGISTRY_BOOTSTRAP_FILE: /bootstrap/bootstrap.multiaddr
+      REGISTRY_QUORUM: "1"
+      STORAGE_AUDIENCES: https://storage.example.test/instance/alpha,https://storage.example.test/instance/beta
+    networks: [decent-test]
+    volumes:
+      - registry-bootstrap:/bootstrap:ro
+    depends_on: [bootstrap-init]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  db:
+    image: docker.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: prototype-only
+    volumes:
+      - keycloak-db:/var/lib/postgresql/data
+    networks: [decent-test]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  keycloak1:
+    image: localhost/decent-kc-grant-prototype:26.8.0
+    command: ["start", "--http-enabled=true", "--hostname-strict=false", "--cache=ispn", "--cache-stack=jdbc-ping", "--cache-embedded-mtls-enabled=false", "--import-realm"]
+    environment: &kc-env
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: prototype-only
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_CACHE: ispn
+      KC_CACHE_STACK: jdbc-ping
+      KC_CACHE_EMBEDDED_MTLS_ENABLED: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY_HEADERS: xforwarded
+    ports: ["18080:8080"]
+    networks: [decent-test]
+    volumes:
+      - ./realm.json:/opt/keycloak/data/import/realm.json:ro
+    depends_on:
+      db: {condition: service_healthy}
+      verifier: {condition: service_healthy}
+      bootstrap-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 3s
+      retries: 80
+  keycloak2:
+    image: localhost/decent-kc-grant-prototype:26.8.0
+    command: ["start", "--http-enabled=true", "--hostname-strict=false", "--cache=ispn", "--cache-stack=jdbc-ping", "--cache-embedded-mtls-enabled=false"]
+    environment: *kc-env
+    ports: ["18081:8080"]
+    networks: [decent-test]
+    depends_on:
+      db: {condition: service_healthy}
+      keycloak1: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 3s
+      retries: 80
+networks:
+  decent-test:
+    driver: bridge
+volumes:
+  registry-data:
+  registry-bootstrap:
+  keycloak-db:

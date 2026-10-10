@@ -1,0 +1,161 @@
+{
+  "invalid_listen_host": {
+    "status": "failed",
+    "gates": {
+      "publication": "writer returned; not publication proof",
+      "independent_read": {
+        "status": "passed",
+        "attempts": 1,
+        "sequence": 1,
+        "exact_identity_and_key": true
+      },
+      "resolver_container": {
+        "status": "failed",
+        "diagnostic": "{\"status\": \"failed\", \"exception_type\": \"StringParseError\"}"
+      }
+    },
+    "listen_host": "registry",
+    "sources": {
+      "decent-registry": {
+        "revision": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+        "dirty": false
+      },
+      "decent-identity": {
+        "revision": "2caec24de52c2dbe241e72fe317281c051d03f89",
+        "dirty": true
+      },
+      "decent-simple-storage": {
+        "revision": "d1757b0f85aa6b5c77715553543e2596b15148f4",
+        "dirty": true
+      }
+    },
+    "images": {
+      "localhost/decent-registry-prototype:local": "7fc72811cd00b0daee002f530065e3231b1b8bcc78e8b407610646486e348ded",
+      "localhost/decent-identity-verifier-prototype:local": "0315f60f9f9bf9939c0e815319594c5fdccb01fcbb9e89ad18e8945626a53ed5"
+    },
+    "registry_peer_id": "12D3KooWDwAA9tmDQ5AW8N2fFqPAPEWjD4mwHmEieEh2fQgxogG1",
+    "failure": {
+      "gate": "resolver_container",
+      "exception_type": "AssertionError",
+      "message": "resolver container failed"
+    },
+    "cleanup": {
+      "errors": [],
+      "scratch_removed": true,
+      "containers_removed": true
+    }
+  },
+  "asyncio_before_fix": {
+    "status": "failed",
+    "gates": {
+      "publication": "writer returned; not publication proof",
+      "independent_read": {
+        "status": "passed",
+        "attempts": 1,
+        "sequence": 1,
+        "exact_identity_and_key": true
+      },
+      "resolver_container": {
+        "status": "passed",
+        "diagnostic": "{\"status\": \"passed\", \"sequence\": 1}"
+      },
+      "http_verifier": {
+        "status_code": 503
+      }
+    },
+    "listen_host": "0.0.0.0",
+    "sources": {
+      "decent-registry": {
+        "revision": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+        "dirty": false
+      },
+      "decent-identity": {
+        "revision": "2caec24de52c2dbe241e72fe317281c051d03f89",
+        "dirty": true
+      },
+      "decent-simple-storage": {
+        "revision": "d1757b0f85aa6b5c77715553543e2596b15148f4",
+        "dirty": true
+      }
+    },
+    "images": {
+      "localhost/decent-registry-prototype:local": "7fc72811cd00b0daee002f530065e3231b1b8bcc78e8b407610646486e348ded",
+      "localhost/decent-identity-verifier-prototype:local": "0315f60f9f9bf9939c0e815319594c5fdccb01fcbb9e89ad18e8945626a53ed5"
+    },
+    "registry_peer_id": "12D3KooWKsaTmbFkRmocKNW4P7BPNtVLPZoacL87EmfwyHqBGgS8",
+    "failure": {
+      "gate": "http_verifier",
+      "exception_type": "AssertionError",
+      "message": "live verifier returned 503"
+    },
+    "cleanup": {
+      "errors": [],
+      "scratch_removed": true,
+      "containers_removed": true
+    }
+  },
+  "corrected_positive": {
+    "status": "passed",
+    "gates": {
+      "publication": "writer returned; not publication proof",
+      "independent_read": {
+        "status": "passed",
+        "attempts": 1,
+        "sequence": 1,
+        "exact_identity_and_key": true
+      },
+      "resolver_container": {
+        "status": "passed",
+        "diagnostic": "{\"status\": \"passed\", \"sequence\": 1}"
+      },
+      "http_verifier": {
+        "status_code": 200,
+        "exact_claims": true
+      }
+    },
+    "listen_host": "0.0.0.0",
+    "sources": {
+      "decent-registry": {
+        "revision": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
+        "dirty": false
+      },
+      "decent-identity": {
+        "revision": "2caec24de52c2dbe241e72fe317281c051d03f89",
+        "dirty": true
+      },
+      "decent-simple-storage": {
+        "revision": "d1757b0f85aa6b5c77715553543e2596b15148f4",
+        "dirty": true
+      }
+    },
+    "images": {
+      "localhost/decent-registry-prototype:local": "7fc72811cd00b0daee002f530065e3231b1b8bcc78e8b407610646486e348ded",
+      "localhost/decent-identity-verifier-prototype:local": "0972b58f33f1277d90b316ce0bc95f8401ec5de3c288deab0ab34bff88d7ec57"
+    },
+    "registry_peer_id": "12D3KooWJH7LXd9guS4h3RTswgy4Q27HbWMGNsYtLELvBoLyhkEQ",
+    "cleanup": {
+      "errors": [],
+      "scratch_removed": true,
+      "containers_removed": true
+    }
+  },
+  "runner_positive": {
+    "status": "passed",
+    "gates": {
+      "independent_read": "passed",
+      "resolver_container": "passed",
+      "http_verifier": "passed"
+    }
+  },
+  "runner_rejection": {
+    "status": "failed",
+    "gates": {
+      "independent_read": "passed",
+      "resolver_container": "passed"
+    },
+    "failure": {
+      "gate": "http_verifier",
+      "exception_type": "HTTPError"
+    }
+  }
+}
