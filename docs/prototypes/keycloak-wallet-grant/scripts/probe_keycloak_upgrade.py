@@ -14,12 +14,8 @@ def main():
   p=argparse.ArgumentParser();p.add_argument('--report',type=Path,required=True);args=p.parse_args()
   report={'checked_at':datetime.now(timezone.utc).isoformat(),'baseline':'26.8.0','verdict':'blocked','forward_compatibility':'not-tested','sources':{'release_api':'https://api.github.com/repos/keycloak/keycloak/releases/latest','maven_metadata':'https://repo.maven.apache.org/maven2/org/keycloak/keycloak-services/maven-metadata.xml','container_repository':'quay.io/keycloak/keycloak'}}
   try:
-    command=subprocess.run(['gh','api','repos/keycloak/keycloak/releases/latest'],capture_output=True,text=True,timeout=30)
-    # Avoid dependence on the shell gh wrapper; HTTPS fallback contains no auth.
-    if command.returncode:
-      request=urllib.request.Request(report['sources']['release_api'],headers={'User-Agent':'decent-keycloak-prototype'})
-      with urllib.request.urlopen(request,timeout=30) as response:release=json.load(response)
-    else:release=json.loads(command.stdout)
+    request=urllib.request.Request(report['sources']['release_api'],headers={'User-Agent':'decent-keycloak-prototype'})
+    with urllib.request.urlopen(request,timeout=30) as response:release=json.load(response)
     report['latest_release']=release['tag_name']
     with urllib.request.urlopen(report['sources']['maven_metadata'],timeout=30) as response:metadata=ET.fromstring(response.read())
     report['maven_release']=metadata.findtext('versioning/release')
