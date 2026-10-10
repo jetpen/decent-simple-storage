@@ -22,7 +22,7 @@
     "profile": "pinned-live-prototype",
     "verdict": "passed",
     "sources": {
-      "decent-simple-storage": "1a1fecfc33c173606de47672f251d6748d58369c",
+      "decent-simple-storage": "18d98b3dfb09fc84f68e3c028754f75d61d62942",
       "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
       "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
     },
@@ -64,6 +64,10 @@
       "tests.test_pinned_source.test_source_archive_excludes_uncommitted_and_untracked_files",
       "tests.test_upgrade_gate.test_baseline_candidate_is_not_a_forward_upgrade",
       "tests.test_upgrade_gate.test_candidate_tag_cannot_replace_digest_identity",
+      "tests.test_upgrade_gate.test_failed_candidate_cannot_claim_conformance",
+      "tests.test_upgrade_gate.test_fresh_start_success_never_claims_deployment_upgrade_safety[None]",
+      "tests.test_upgrade_gate.test_fresh_start_success_never_claims_deployment_upgrade_safety[candidate1]",
+      "tests.test_upgrade_gate.test_fresh_start_success_never_claims_deployment_upgrade_safety[candidate2]",
       "tests.test_upgrade_gate.test_newer_candidate_is_explicitly_forward",
       "tests.test_upgrade_gate.test_unpaired_candidate_inputs_are_rejected",
       "tests.test_verifier.test_exact_identifier_current_key_and_seq_are_returned",
@@ -77,23 +81,30 @@
       "tests.test_verifier_runtime.test_resolver_executes_on_its_trio_runtime_from_asyncio_http"
     ],
     "images": {
-      "keycloak": "ee11a5636dca11d9dcf1f236ec4ac1b192781ec2b2841b7bf3dd2219c0ca61fe",
-      "registry": "59c35a526b9193ee989b246cf17595059be2b490f684778a94dc0d214ae5fb9f",
-      "verifier": "07213317b2b50cfb1d581cf16898838d7c1d0a3e2bd9edd0e00332467c73e457",
+      "keycloak": "71ad5bca9319485c3ac216b7ed95a12d0a986e3bb6fc06fed14eea801f0e342e",
+      "registry": "3785ad5e047ffbcc10be4c56da773be2bfd6b51c612d9f8675a7dd99016bdcfe",
+      "verifier": "893da5454a4b55e7e9d3e128d4be8bab3c7e0bbb6907c66c5c88f1e1579da318",
       "keycloak_base": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
       "python_base": "docker.io/library/python@sha256:2b4f19dae3a777dfc3b76730bda1e82e1f66ab2a2686fa93ca78edbfb4f04ffe",
       "postgres_base": "docker.io/library/postgres@sha256:aa90e97ee862e558111d34cfb8b2c4bec768c2b039fb791341686928560263b3",
       "alpine_base": "docker.io/library/alpine@sha256:3c81aa9a3d770b316568f4499e30461a5cd3fbd7180bd89e28e34894c7845832"
     },
-    "upgrade_compatibility": "not-established",
-    "workspace_removed": true
+    "workspace_removed": true,
+    "compatibility_scope": {
+      "fresh_start_conformance": "passed",
+      "forward_release_fresh_start": "not-tested",
+      "persisted_state_migration": "not-tested",
+      "mixed_version_rolling": "not-tested",
+      "rollback_restore": "not-tested",
+      "optimized_startup": "not-tested"
+    }
   },
   "mismatched_candidate_denied": {
     "schema": 1,
     "profile": "pinned-live-prototype",
     "verdict": "failed",
     "sources": {
-      "decent-simple-storage": "1a1fecfc33c173606de47672f251d6748d58369c",
+      "decent-simple-storage": "18d98b3dfb09fc84f68e3c028754f75d61d62942",
       "decent-registry": "0fa9a6b631bd77725418e990ae9ea4d974dc546c",
       "decent-identity": "2caec24de52c2dbe241e72fe317281c051d03f89"
     },
@@ -108,13 +119,22 @@
     },
     "python_lock_sha256": "2059c4f24c3e4fcfd688accd8518af42576cbb689a4ec269ecd83e0a321b8f94",
     "failure_category": "ValueError",
-    "workspace_removed": true
+    "workspace_removed": true,
+    "compatibility_scope": {
+      "fresh_start_conformance": "not-established",
+      "forward_release_fresh_start": "not-established",
+      "persisted_state_migration": "not-tested",
+      "mixed_version_rolling": "not-tested",
+      "rollback_restore": "not-tested",
+      "optimized_startup": "not-tested"
+    }
   },
   "scope": [
     "No forward release compatibility claimed: no matching newer released API/runtime found.",
     "Candidate path compiles provider and test code against candidate Maven API and runs full clean cluster suite on matching digest-pinned runtime.",
     "Clean new database only: not an in-place schema/realm/cache migration, mixed-version rolling-upgrade or rollback test.",
-    "Nightly is an optional development experiment, not silently substituted for a released candidate."
+    "Nightly is an optional development experiment, not silently substituted for a released candidate.",
+    "Receipt compatibility_scope separately labels fresh-start, forward-release fresh-start, persisted-state migration, mixed-version rolling, rollback restoration and optimized startup; no generic forward-tested upgrade label."
   ],
   "primary_docs": [
     "https://www.keycloak.org/docs/latest/upgrading/index.html",
